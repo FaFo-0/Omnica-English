@@ -104,7 +104,7 @@ export default function StudentOnboardingPage() {
   // Read on the first render, before any effect can write it: has this visitor
   // ever picked an app language?
   const hadLanguageChoice = useRef(
-    typeof window !== "undefined" && !!window.localStorage.getItem("lingulab-locale"),
+    typeof window !== "undefined" && !!window.localStorage.getItem("omnica-locale"),
   );
   const languageDefaulted = useRef(false);
 

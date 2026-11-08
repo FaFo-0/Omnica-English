@@ -43,10 +43,10 @@ The Clerk keys must come from the same production instance. Do not print, commit
 
 ## Custom domain
 
-1. Add the chosen domain to Vercel project `next-js-omni-class` and apply the DNS records Vercel displays.
+1. Add the chosen domain to Vercel project `omnica-english` and apply the DNS records Vercel displays.
 2. Wait until Vercel reports the domain and certificate as valid.
 3. Add the same origin in Clerk's production domain/origin configuration and follow Clerk's DNS instructions for authentication endpoints.
-4. Keep `https://next-js-omni-class.vercel.app` attached until the custom-domain checks pass.
+4. The old `next-js-omni-class.vercel.app` domain is kept attached with a Vercel-level 308 redirect to the apex (domain settings, not code).
 5. Make the custom domain primary in Vercel only after Clerk sign-in works there.
 
 Public student signup is `https://<domain>/sign-up`. Teacher invite links are generated in Admin Settings and use `window.location.origin`, so they automatically use the domain on which the admin opens Settings.
@@ -79,7 +79,7 @@ Current observations supersede old completion notes. No production data reset or
 |---|---|
 | Apex | `https://omnicaenglish.com/privacy?lang=en&launch_probe=1` → 200 with validated TLS; HTTP → HTTPS 308 preserving path/query. |
 | www | Initially TLS hostname mismatch; Vercel project had only apex and old Vercel host. Added `www.omnicaenglish.com`, redirect **308 to omnicaenglish.com**. Fresh validated-TLS request now returns `Location: https://omnicaenglish.com/privacy?lang=en&launch_probe=1`. |
-| Canonical / Vercel | Apex dashboard shows **Valid Configuration / Production** and project card uses apex. Old `next-js-omni-class.vercel.app` returns 308 to apex preserving path/query via repository redirect. www is a Vercel domain redirect, not a separate app origin. No additional “primary” control was visible; observed routing establishes apex as canonical. |
+| Canonical / Vercel | Apex dashboard shows **Valid Configuration / Production** and project card uses apex. Old `next-js-omni-class.vercel.app` returns 308 to apex preserving path/query via Vercel domain-level redirect (moved out of `next.config.ts` 2026-11-08). |
 | Clerk | Public production environment reports production mode, issuer `https://clerk.omnicaenglish.com`, home `https://omnicaenglish.com`, Google enabled, Organizations disabled. Embedded SignIn/SignUp force `/onboarding/post-signup`. Hosted component URLs still use `accounts.omnicaenglish.com`; hosted after-sign-in/up are apex root. |
 | Teacher invite | Generate from Admin Settings on apex: `https://omnicaenglish.com/sign-up?invite=…`. Do not publish the token. App wrapper saves the short-lived invite cookie; post-signup handles authenticated acceptance before routing. A fresh valid production invite acceptance has **not** been exercised. Existing Firefox production admin session successfully opened `/admin` with real Convex metrics. |
 | Teacher setup | Both stored teachers completed onboarding, have phone contacts, consent and HTTPS `meet.google.com/xxx-xxxx-xxx` rooms. Both bios empty. Mustafa: Mon–Fri 15:00–20:30; Sally: Mon 11:00–17:00, Fri 11:00–15:30, academy time. These are existing stored hours, not newly assigned or guarantees of dated booking availability. Meet room ownership/audio capture not tested. |

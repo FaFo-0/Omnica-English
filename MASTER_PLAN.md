@@ -129,7 +129,7 @@ scripts/dev-login.mjs   messages/   POLICY.md
 
 | Piece | Value |
 |---|---|
-| Vercel | project `next-js-omni-class`, team `fafo-s-projects`; `git push origin master` auto-builds prod. |
+| Vercel | project `omnica-english`, team `fafo-s-projects`. `master` = production (omnicaenglish.com); every other branch gets a login-protected preview URL wired to dev Convex + dev Clerk. Old `next-js-omni-class.vercel.app` 308-redirects to the apex via Vercel domain settings. |
 | Convex prod | `valuable-loris-929` — **manual `npx convex deploy` required for every `convex/` change** (no `CONVEX_DEPLOY_KEY` in Vercel). |
 | Convex dev | `quixotic-quail-572` (`npx convex dev`). |
 | Clerk | App **Omnica English**. Production instance (`ins_3Jzpg…`) serves omnicaenglish.com; development instance `secure-husky-22.clerk.accounts.dev` serves localhost, previews and QA. Identity/session provider only; the `convex` JWT template has no organization claims. |
@@ -315,7 +315,7 @@ Reading = collecting into one word list (no per-word statuses) · flashcards dra
 
 ## 7. Change Log
 
-| 2026-11-08 | **[Claude] OmniClass name retired; the project is Omnica English.** Renamed in code (software brand, package name, comments), AI rules (CLAUDE.md, AGENTS.md), README, MASTER_PLAN, docs and library attributions; QA actor emails moved to `+omnica@example.com` (dev re-seeded, old dev Clerk QA users deleted). GitHub repo is now `FaFo-0/omnica-english`; Clerk app renamed by FaFo. Corrected §4: production already runs on the Clerk production instance. Kept on purpose: the `lingulab-locale` browser key (renaming would reset every user's saved language) and the old `next-js-omni-class.vercel.app` redirect. 508 tests + both typechecks pass. No schema, data or policy change. |
+| 2026-11-08 | **[Claude] OmniClass name retired; the project is Omnica English.** Renamed in code (software brand, package name, comments), AI rules (CLAUDE.md, AGENTS.md), README, MASTER_PLAN, docs and library attributions; QA actor emails moved to `+omnica@example.com` (dev re-seeded, old dev Clerk QA users deleted). GitHub repo is now `FaFo-0/omnica-english`; Clerk app renamed by FaFo. Corrected §4: production already runs on the Clerk production instance. Follow-up same day: browser key `lingulab-locale` → `omnica-locale` (FaFo accepted that the 3 students re-pick their language once); old-domain redirect moved from `next.config.ts` to Vercel domain settings; Vercel project renamed `omnica-english`; preview env now points at dev Convex; dev Clerk test mode on. 508 tests + both typechecks pass. No schema, data or policy change. |
 
 | 2026-11-08 | **[Claude] Claude cloud sessions connected to the stack.** Created the Next.js-OmniClass- cloud environment (network allowlist, Clerk + Convex + Vercel secrets, setup script incl. Vercel CLI) and documented its quirks in §4. Verified: `qa:setup` seeded dev, QA admin signs in and the admin dashboard loads live dev data. No app code, schema, data or policy change; prod untouched. |
 
