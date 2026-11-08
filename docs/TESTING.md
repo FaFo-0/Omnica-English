@@ -1,6 +1,6 @@
 # Testing
 
-OmniClass uses automated developer checks for code correctness and a human-operated runbook for product behavior.
+Omnica English uses automated developer checks for code correctness and a human-operated runbook for product behavior.
 
 ## Developer gates
 

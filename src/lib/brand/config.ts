@@ -1,8 +1,8 @@
-// LinguLab brand + tenant configuration layer.
+// Omnica English brand + academy configuration layer.
 //
 // Two brand layers exist in this codebase:
 //
-//   1. SOFTWARE_BRAND — the software product itself (LinguLab).
+//   1. SOFTWARE_BRAND — the product itself (Omnica English).
 //      Hardcoded. Permanent. Appears only on super-admin, legal, and
 //      neutral system surfaces. Never shown on tenant-facing UI.
 //
@@ -17,15 +17,14 @@
 // therapy, coaching) swaps the data in `current-tenant-brand.ts`.
 //
 // Rule: nothing in this file (or anywhere else) should hardcode a tenant
-// name literal. Only SOFTWARE_BRAND.name ("LinguLab") is a hardcoded
-// product name anywhere in the codebase.
+// name literal. Only SOFTWARE_BRAND.name is a hardcoded product name
+// anywhere in the codebase.
 
 // ── Software brand (permanent) ─────────────────────────────────────
 export const SOFTWARE_BRAND = {
-  name: "OmniClass",
-  tagline: "The class management platform for any business that teaches",
-  supportEmail: "support@omniclass.app",
-  websiteUrl: "https://omniclass.app",
+  name: "Omnica English",
+  tagline: "Online English lessons with a teacher",
+  websiteUrl: "https://omnicaenglish.com",
 } as const;
 
 export type SoftwareBrand = typeof SOFTWARE_BRAND;

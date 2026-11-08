@@ -1,6 +1,6 @@
-# OmniClass
+# Omnica English
 
-Multi-tenant language academy platform. One codebase, many tenants: each tenant is an academy (teachers, students, admins, lessons, packages, content). OmniClass handles recording, real-time transcription, AI-generated lesson content (summary / vocab / flashcards / quiz), SRS review, scheduling, and gamification.
+Online English academy at [omnicaenglish.com](https://omnicaenglish.com): public website plus student, teacher and admin portals. The app handles recording, real-time transcription, AI-generated lesson content (summary / vocab / flashcards / quiz), SRS review, scheduling, and gamification.
 
 ## Tech Stack
 

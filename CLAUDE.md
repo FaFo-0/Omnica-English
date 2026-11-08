@@ -1,6 +1,6 @@
-# OmniClass — AI Instructions
+# Omnica English — AI Instructions
 
-Multi-tenant language-academy platform (software: **OmniClass**; first tenant: **Omnica English**). Owner: Mustafa (FaFo).
+Online English academy **Omnica English** (omnicaenglish.com) — website, student/teacher/admin portals, one codebase. Owner: Mustafa (FaFo). The old internal name "OmniClass" is retired; don't reintroduce it.
 
 ## Files that matter
 

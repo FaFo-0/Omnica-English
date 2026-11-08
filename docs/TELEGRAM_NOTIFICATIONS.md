@@ -37,7 +37,7 @@ choose **Connect Telegram** in their Profile.
    ```
 
 5. Verify Telegram returns `{"ok":true,...}`, then use the bot link generated
-   from an OmniClass profile. `/start CODE` should reply that notifications are
+   from an Omnica English profile. `/start CODE` should reply that notifications are
    connected. Send `/stop` to verify disconnecting.
 
 ## Member behavior and privacy
@@ -46,7 +46,7 @@ choose **Connect Telegram** in their Profile.
   only accepts the code in a private chat.
 - Desktop users can open the bot hand-off page and press **Start**, or paste the
   displayed `/start CODE` command into the bot manually.
-- One Telegram chat belongs to one OmniClass identity. Connecting it to another
+- One Telegram chat belongs to one Omnica English identity. Connecting it to another
   account unlinks the old account instead of mixing private notifications.
 - Members can disconnect from Profile or send `/stop` to the bot. A new link
   replaces an old chat, which covers lost devices and mistaken connections.
@@ -57,13 +57,13 @@ choose **Connect Telegram** in their Profile.
 
 - New read-only commands are available after connecting: `/help`, `/status`, `/next`, `/today`, `/homework`, `/balance`, `/study`, and `/recent`.
 - Commands retrieve authorized account information only. They do not book, cancel, reschedule, grade, pay, edit profiles, or change platform data.
-- Every command response routes the member to the relevant authenticated OmniClass page for any action.
+- Every command response routes the member to the relevant authenticated Omnica English page for any action.
 - Arabic and Russian members receive native-language notification copy first, followed by English. English and unknown locales receive English only.
 
 ## Delivery behavior
 
 The cron checks new notification rows once per minute. Messages include the
-meeting URL when a lesson reminder has one, and an **Open OmniClass** button
+meeting URL when a lesson reminder has one, and an **Open Omnica English** button
 that routes to the underlying lesson, homework, calendar, billing or other
 relevant page. If Telegram is blocked or temporarily unavailable, the in-app
 bell retains the notification and the delivery failure is logged without

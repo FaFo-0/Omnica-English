@@ -1,6 +1,6 @@
-# OmniClass — AI Instructions
+# Omnica English — AI Instructions
 
-Multi-tenant language-academy platform (software: **OmniClass**; first tenant: **Omnica English**). Owner: Mustafa (FaFo).
+Online English academy **Omnica English** (omnicaenglish.com) — website, student/teacher/admin portals, one codebase. Owner: Mustafa (FaFo). The old internal name "OmniClass" is retired; don't reintroduce it.
 
 ## Files that matter
 
@@ -31,7 +31,7 @@ Next.js 16 (App Router, Turbopack) · Tailwind CSS v4 + shadcn/ui · **Convex** 
 - **Never `new Date(date + "T" + time)` without a timezone.** Stored times are academy wall-clock (Asia/Almaty). Use `wallTimeToMs` / `zonedToInstant`.
 - **Reading model locked:** word on the student's list (green) or plain prose. No per-word statuses. One shared `ReadingView` for all portals.
 - **`srsCards` is the one word list** — flashcards, My Words, reading tint all derive from it. Card answers = translation into the student's L1 (`users.getLearnerLocale`).
-- **Client-facing name is always "Omnica English".** Never show "OmniClass" / "Omni Class" to clients or students in UI, library copy, notifications (including Telegram), downloads, or metadata. Internal software/repository references may retain OmniClass.
+- **The name is always "Omnica English"** — UI, copy, notifications, metadata, docs and code. "OmniClass" is retired.
 - **Say "lessons", never "points"** in any user-facing copy.
 - Logical CSS properties (`ms-`/`me-`/`ps-`/`pe-`) for future RTL. No hardcoded tenant branding — `tenantSettings` owns it.
 - No over-engineering. Pre-launch, ~50 students target — build for that.

@@ -17,10 +17,10 @@ export const seed = internalMutation({
     // Fail closed even if someone accidentally runs this on production.
     const issuer = assertQaBackendEnvironment(process.env.CONVEX_CLOUD_URL, process.env.CLERK_JWT_ISSUER_DOMAIN);
     const expected = [
-      ['admin', 'admin', 'en', 'qa-admin+omniclass@example.com'],
-      ['teacher', 'teacher', 'en', 'qa-teacher+omniclass@example.com'],
-      ['student', 'student', 'ru', 'qa-student-ru+omniclass@example.com'],
-      ['student-kk', 'student', 'kk', 'qa-student-kk+omniclass@example.com'],
+      ['admin', 'admin', 'en', 'qa-admin+omnica@example.com'],
+      ['teacher', 'teacher', 'en', 'qa-teacher+omnica@example.com'],
+      ['student', 'student', 'ru', 'qa-student-ru+omnica@example.com'],
+      ['student-kk', 'student', 'kk', 'qa-student-kk+omnica@example.com'],
     ];
     if (accounts.length !== expected.length || new Set(accounts.map(a => a.externalId)).size !== expected.length ||
         expected.some(([key, role, locale, email]) => !accounts.some(a => a.key === key && a.role === role && a.locale === locale && a.email === email && a.externalId.startsWith('user_')))) {

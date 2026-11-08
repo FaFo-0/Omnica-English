@@ -1,4 +1,4 @@
-// Platform owner. OmniClass is multi-tenant software; a superadmin is an
+// Platform owner. The codebase keeps multi-academy scoping; a superadmin is an
 // account that belongs to the software rather than to one academy, so it can
 // never be demoted, removed or stripped of permissions by a tenant admin.
 //

@@ -6,10 +6,10 @@ export const manifestPath = resolve(root, '.qa/accounts.json');
 export const devDeployment = 'dev:quixotic-quail-572';
 export const devUrl = 'https://quixotic-quail-572.convex.cloud';
 export const actors = Object.freeze([
-  { key: 'admin', role: 'admin', locale: 'en', email: 'qa-admin+omniclass@example.com', name: 'QA Admin' },
-  { key: 'teacher', role: 'teacher', locale: 'en', email: 'qa-teacher+omniclass@example.com', name: 'QA Teacher' },
-  { key: 'student', role: 'student', locale: 'ru', email: 'qa-student-ru+omniclass@example.com', name: 'QA Student Russian' },
-  { key: 'student-kk', role: 'student', locale: 'kk', email: 'qa-student-kk+omniclass@example.com', name: 'QA Student Kazakh' },
+  { key: 'admin', role: 'admin', locale: 'en', email: 'qa-admin+omnica@example.com', name: 'QA Admin' },
+  { key: 'teacher', role: 'teacher', locale: 'en', email: 'qa-teacher+omnica@example.com', name: 'QA Teacher' },
+  { key: 'student', role: 'student', locale: 'ru', email: 'qa-student-ru+omnica@example.com', name: 'QA Student Russian' },
+  { key: 'student-kk', role: 'student', locale: 'kk', email: 'qa-student-kk+omnica@example.com', name: 'QA Student Kazakh' },
 ]);
 export function readEnv() {
   return Object.fromEntries(readFileSync(resolve(root, '.env.local'), 'utf8').split(/\r?\n/)

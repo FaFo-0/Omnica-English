@@ -89,7 +89,7 @@ export async function mintLoginUrl(role, { base = "http://localhost:3000" } = {}
 }
 
 async function privateHandoff(payload, requestedPath) {
-  const dir = requestedPath ? dirname(resolve(requestedPath)) : await mkdtemp(join(tmpdir(), "omniclass-login-"));
+  const dir = requestedPath ? dirname(resolve(requestedPath)) : await mkdtemp(join(tmpdir(), "omnica-login-"));
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   const file = requestedPath ? resolve(requestedPath) : join(dir, `${payload.role}.json`);
   writeFileSync(file, `${JSON.stringify(payload)}\n`, { mode: 0o600 });

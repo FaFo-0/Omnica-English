@@ -29,7 +29,7 @@ test('internal QA seeding refuses production and unknown backends even with deve
 });
 
 test('shared Clerk QA identities cannot auto-enroll in production', () => {
-  for (const email of ['qa-admin+omniclass@example.com', 'qa-teacher+omniclass@example.com', 'qa-student-ru+omniclass@example.com', 'qa-student-kk+omniclass@example.com']) {
+  for (const email of ['qa-admin+omnica@example.com', 'qa-teacher+omnica@example.com', 'qa-student-ru+omnica@example.com', 'qa-student-kk+omnica@example.com']) {
     assert.doesNotThrow(() => assertQaIdentityAllowed(email, devUrl));
     assert.throws(() => assertQaIdentityAllowed(email, 'https://valuable-loris-929.convex.cloud'));
     assert.throws(() => assertQaIdentityAllowed(email, undefined));

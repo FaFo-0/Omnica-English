@@ -1,8 +1,8 @@
-# OmniClass — Platform Reference
+# Omnica English — Platform Reference
 
-> **What:** OmniClass — single-academy language platform for **Omnica English** (Russian/Arabic-L1 students learning English). Owner: Mustafa (FaFo).
+> **What:** **Omnica English** — online English academy platform (Russian/Arabic-L1 students learning English). Owner: Mustafa (FaFo).
 > **Live:** https://omnicaenglish.com · Convex prod `valuable-loris-929` · Academy key `org_3DIbJAWeR5CjVaBRlB4AZXL1UpD`
-> **Stage:** pre-launch. Production currently includes two test student accounts; target ~50. Don't build for scale that doesn't exist.
+> **Stage:** live in production (Nov 2026: 3 students, 2 teachers); target ~50. Don't build for scale that doesn't exist.
 > **Business rules:** [POLICY.md](POLICY.md) is the single source of truth for payments, cancellation, no-show, pauses, trials. This file never restates policy — it links to it.
 > **AI behavior rules:** [CLAUDE.md](CLAUDE.md).
 
@@ -29,7 +29,7 @@
 | **"Points" are dead as a user-facing word.** Students see **lessons** ("8 lessons left"). Internals still use point tables at 1 lesson = 1 unit. | FaFo decision 2026-07-14. |
 | Tailwind `inset-inline-*`/`inset-x-*` utilities generate no CSS in this setup — use inline `insetInlineStart/End` for absolute overlays. | Calendar bands collapsed to 2px. |
 | Use logical CSS properties (`ms-`, `me-`, `ps-`, `pe-`) for future RTL. English first, then Russian, then Arabic. | Arabic market. |
-| **Client-facing name is always Omnica English.** Never expose OmniClass / Omni Class in UI, library copy, notifications (including Telegram), downloads, or metadata; internal software/repository references may retain it. | FaFo decision 2026-10-17. |
+| **The name is always Omnica English** — UI, copy, notifications, metadata, docs, code, repo. "OmniClass" is retired. | FaFo decisions 2026-10-17, 2026-11-08. |
 | Never hardcode tenant branding — colors/name live in `tenantSettings`. | Multi-tenant. |
 | All Convex access via `convex/lib/tenant.ts` (`requireTenant` / `requireTenantPermission` / `tenantTable`) — no raw cross-org `ctx.db` in feature code. | Tenancy isolation. |
 | If style edits don't show in dev: delete `.next` (Turbopack stale cache). | Hit 2026-07-18. |
@@ -114,7 +114,7 @@ scripts/dev-login.mjs   messages/   POLICY.md
 | Reading & word bank | `libraryWorks.ts`, `libraryPreparation.ts`, `libraryImport.ts`, `library.ts` | Revision-checked, resumable contextual vocabulary prepares the opening chapter before publication and later chapters on demand. Large text lives in `libraryUnitBodies`; navigation, progress and queue checks read small `libraryUnits` metadata. Imports upsert one indexed chapter; unchanged text preserves preparation. Preparation allows 100 model attempts/academy/UTC day; recovery runs every 15 minutes. Shared reader loads results with the chapter; dictionary/MyMemory remain missing-entry fallbacks. Stable imports and chapters, optional external links, owner-scoped progress. |
 | SRS / word list | `srs.ts`, `lib/sm2.ts` | One default deck per student; add is idempotent per word; SM-2 with reviewer-local dates; 60/session + `NEW_CARDS_PER_DAY=15` caps; `listMyWords` (state derived: new/learning/learned), `getWordSet` (paints reading), edit/remove. |
 | Homework | `homework.ts`, `homeworkAi.ts`, `nodes.ts` | Draft → assign → submit → review; auto-grading (fill-blank, choice) + teacher overrides; answer keys stripped server-side pre-review; student writes merge answers only. **`dueAt` defaults to the student's next lesson** (POLICY §10 defines the deadline that way) — stored as a real instant, automatic deadlines follow booking/move/cancel/reassignment; teacher overrides or explicit clears via `setDueDate` remain fixed. |
-| Notifications | `notifications.ts`, `telegram.ts`, `src/lib/notificationText.ts` | Registry-validated kind+payload rows → human sentences; one-time starts are recipient-idempotent. Bell in all portals with a destination for every kind. Members may optionally link a Telegram private chat via a single-use profile code; the outbox cron delivers new notifications (including Meet links) with direct OmniClass buttons, bounded retries, and durable non-sensitive failure state. Academy setup: `docs/TELEGRAM_NOTIFICATIONS.md`. |
+| Notifications | `notifications.ts`, `telegram.ts`, `src/lib/notificationText.ts` | Registry-validated kind+payload rows → human sentences; one-time starts are recipient-idempotent. Bell in all portals with a destination for every kind. Members may optionally link a Telegram private chat via a single-use profile code; the outbox cron delivers new notifications (including Meet links) with direct Omnica English buttons, bounded retries, and durable non-sensitive failure state. Academy setup: `docs/TELEGRAM_NOTIFICATIONS.md`. |
 | Gamification | `achievements.ts`, `streaks.ts`, `study.ts` | Study sessions + quiz attempts recorded; both bump the streak (`bumpStreak`, student-local dates) and run `evaluateAchievements` — recomputes all five counters (completed lessons, reviews, perfect quizzes, longest streak, learned words) and unlocks + notifies anything newly crossed. Idempotent; `syncMine` catches up on page open. |
 | Onboarding & lifecycle | `onboarding.ts`, `retention.ts`, `maintenance.ts` | Student form + trial grant; admin attention signals; batched data-wipe helper (used for 2026-07-23 pre-launch reset). |
 | ICS | `http.ts` (`/ics?token=`) | Per-user token feed, correct UTC conversion, Meet link as LOCATION. |
@@ -132,12 +132,12 @@ scripts/dev-login.mjs   messages/   POLICY.md
 | Vercel | project `next-js-omni-class`, team `fafo-s-projects`; `git push origin master` auto-builds prod. |
 | Convex prod | `valuable-loris-929` — **manual `npx convex deploy` required for every `convex/` change** (no `CONVEX_DEPLOY_KEY` in Vercel). |
 | Convex dev | `quixotic-quail-572` (`npx convex dev`). |
-| Clerk | dev keys (`secure-husky-22.clerk.accounts.dev`); identity/session provider only. The `convex` JWT template has no organization claims; production cutover replaces both Clerk keys together and pre-creates staff roles in Convex. |
+| Clerk | App **Omnica English**. Production instance (`ins_3Jzpg…`) serves omnicaenglish.com; development instance `secure-husky-22.clerk.accounts.dev` serves localhost, previews and QA. Identity/session provider only; the `convex` JWT template has no organization claims. |
 | Env — Vercel | `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CONVEX_SITE_URL`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`. |
 | Env — Convex prod | `CLERK_JWT_ISSUER_DOMAIN`, `OPENROUTER_API_KEY`, `SONIOX_API_KEY`. |
 | Reusable localhost QA | `npm run qa:setup` reuses fictional admin/teacher/Russian-student/Kazakh-student actors and populates dev fixtures. `npm run qa:replenish` restores credits/due cards without deleting history. |
 | AI browser login | `node scripts/dev-login.mjs admin\|teacher\|student\|student-kk` writes a private five-minute ticket file. Use only localhost and dev `quixotic-quail-572`; identities listed in `scripts/qa-config.mjs`. |
-| Claude cloud sessions | Environment **Next.js-OmniClass-** (personal) allowlists Convex dev/prod, Clerk, Fonts, Vercel; its setup script runs `npm ci` and writes a non-secret `.env.local`. Clerk secret key + Convex access token are proxy-injected network secrets (local values are placeholders). Quirks: prefix Node commands that call APIs with `NODE_USE_ENV_PROXY=1` (scripts, `next dev`); run `next dev --webpack` (Turbopack fails on Google Fonts here); Convex CLI commands needing WebSockets (`convex data`, `function-spec`, `env list`, `dev` watch) hang — `convex run --push`, `qa:setup` and deploys use HTTP. Playwright: launch with `proxy: { server: HTTPS_PROXY, bypass: 'localhost' }`. Vercel CLI: token is proxy-injected; pass `--token proxyinjected` (placeholder; dashes rejected), e.g. `vercel ls`, `vercel logs`. |
+| Claude cloud sessions | Environment **Omnica English** (personal) allowlists Convex dev/prod, Clerk, Fonts, Vercel; its setup script runs `npm ci` and writes a non-secret `.env.local`. Clerk secret key + Convex access token are proxy-injected network secrets (local values are placeholders). Quirks: prefix Node commands that call APIs with `NODE_USE_ENV_PROXY=1` (scripts, `next dev`); run `next dev --webpack` (Turbopack fails on Google Fonts here); Convex CLI commands needing WebSockets (`convex data`, `function-spec`, `env list`, `dev` watch) hang — `convex run --push`, `qa:setup` and deploys use HTTP. Playwright: launch with `proxy: { server: HTTPS_PROXY, bypass: 'localhost' }`. Vercel CLI: token is proxy-injected; pass `--token proxyinjected` (placeholder; dashes rejected), e.g. `vercel ls`, `vercel logs`. |
 
 ---
 
@@ -314,6 +314,8 @@ Reading = collecting into one word list (no per-word statuses) · flashcards dra
 ---
 
 ## 7. Change Log
+
+| 2026-11-08 | **[Claude] OmniClass name retired; the project is Omnica English.** Renamed in code (software brand, package name, comments), AI rules (CLAUDE.md, AGENTS.md), README, MASTER_PLAN, docs and library attributions; QA actor emails moved to `+omnica@example.com` (dev re-seeded, old dev Clerk QA users deleted). GitHub repo is now `FaFo-0/omnica-english`; Clerk app renamed by FaFo. Corrected §4: production already runs on the Clerk production instance. Kept on purpose: the `lingulab-locale` browser key (renaming would reset every user's saved language) and the old `next-js-omni-class.vercel.app` redirect. 508 tests + both typechecks pass. No schema, data or policy change. |
 
 | 2026-11-08 | **[Claude] Claude cloud sessions connected to the stack.** Created the Next.js-OmniClass- cloud environment (network allowlist, Clerk + Convex + Vercel secrets, setup script incl. Vercel CLI) and documented its quirks in §4. Verified: `qa:setup` seeded dev, QA admin signs in and the admin dashboard loads live dev data. No app code, schema, data or policy change; prod untouched. |
 

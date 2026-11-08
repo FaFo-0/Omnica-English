@@ -6,7 +6,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ════════════════════════════════════════════════════════════════
- *  OmniClass — Omnica English design tokens.
+ *  Omnica English design tokens.
  *  Brand canvas: yellow #FFCA00. Primary: deep purple #6716A4.
  *  Tokens may be overridden at runtime by `BrandProvider` so a
  *  tenant change recolors the entire portal without a rebuild.

@@ -4,7 +4,7 @@ Use this after the single-tenant auth refactor when replacing the current Clerk 
 
 ## Identity model
 
-OmniClass uses Clerk for identity, sessions, email, and the `convex` JWT template only. It does not use Clerk Organizations, Clerk organization roles, organization activation, or organization membership limits.
+Omnica English uses Clerk for identity, sessions, email, and the `convex` JWT template only. It does not use Clerk Organizations, Clerk organization roles, organization activation, or organization membership limits.
 
 Convex retains every `organizationId` field, index, query scope, and authorization guard. The one production academy is the opaque `ACADEMY_ID` value already stored on its existing rows. Do not rename that value without a separately approved data rewrite.
 

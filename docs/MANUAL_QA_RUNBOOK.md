@@ -1,6 +1,6 @@
-# OmniClass Manual Product QA Runbook
+# Omnica English Manual Product QA Runbook
 
-This is the durable, human-operated product QA guide for OmniClass. It describes the pages and flows mounted in the current App Router tree and the behavior implemented in the application. Use it for release checks, focused regression passes, and controlled pilot checks.
+This is the durable, human-operated product QA guide for Omnica English. It describes the pages and flows mounted in the current App Router tree and the behavior implemented in the application. Use it for release checks, focused regression passes, and controlled pilot checks.
 
 For localhost QA, reuse the fictional actors and fixtures in MASTER_PLAN §4/§5: `npm run qa:setup`, `node scripts/dev-login.mjs admin|teacher|student|student-kk`, and `npm run qa:replenish`. These approved development setup/login commands are exceptions to rule 4 below; exercise actual features through the UI. Do not recreate the actors or reset their history.
 
@@ -231,7 +231,7 @@ Run the mobile student lane first, then a desktop pass for wide tables and keybo
 - [ ] Selecting an offer opens a confirmation with list amount, automatic discount snapshot when applicable, final amount, currency, lessons, and expiry. Expiry visibility is required at checkout; if it is absent, mark **BUG**.
 - [ ] Confirm creates one **pending billing order**. While one is pending, other offer actions are disabled and explain why.
 - [ ] The pending banner and recent order history show plan and status. Rejection shows the admin reason. Admin **Grant** changes the status and balance exactly once.
-- [ ] Payment instructions (recipient, phone, note, QR, or academy contact fallback) render without implying that OmniClass itself completed a transfer.
+- [ ] Payment instructions (recipient, phone, note, QR, or academy contact fallback) render without implying that Omnica English itself completed a transfer.
 
 ### `/student/achievements`
 
