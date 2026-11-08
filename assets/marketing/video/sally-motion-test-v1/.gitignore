@@ -1,6 +1,0 @@
-node_modules/
-.remotion/
-.cache/
-frames/
-.DS_Store
-exports/*-check.*
