@@ -1,5 +1,5 @@
 // Operator-only fixtures. Not a public function or an authentication bypass.
-import { internalMutation } from './_generated/server';
+import { internalMutation, internalQuery } from './_generated/server';
 import { v } from 'convex/values';
 import { ACADEMY_ID, tenantTable } from './lib/tenant';
 import { assertQaBackendEnvironment } from './lib/qaSafety';
@@ -105,3 +105,6 @@ export const seed = internalMutation({
     return { accounts: accounts.length, students: 2, creditsPerStudent: 100, reading: workId, replenished: replenish };
   },
 });
+
+/** No-op target for `npm run push:dev` (`convex run --push` uploads code over HTTP). */
+export const ping = internalQuery({ args: {}, handler: async () => null });

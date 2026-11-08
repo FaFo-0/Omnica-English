@@ -6,6 +6,8 @@ import { ConvexClientProvider } from "./providers";
 import { OMNICA_FALLBACK } from "@/lib/brand/fallback";
 import { PUBLIC_SHARE_CARD } from "@/lib/publicShareCard";
 import { ThemeProvider } from "@/components/theme/theme-provider";
+import { PreviewSwitcher } from "@/components/preview/PreviewSwitcher";
+import { previewLoginEnabled, previewPersonaOptions } from "@/lib/previewLogin";
 import "./globals.css";
 
 const inter = Inter({
@@ -66,6 +68,7 @@ export default function RootLayout({
           <ConvexClientProvider>
             <TooltipProvider>{children}</TooltipProvider>
             <Toaster />
+            {previewLoginEnabled() && <PreviewSwitcher options={previewPersonaOptions()} />}
           </ConvexClientProvider>
         </ThemeProvider>
       </body>

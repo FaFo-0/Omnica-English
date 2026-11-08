@@ -2,6 +2,8 @@ import { ThemeSelect } from "@/components/theme/theme-select";
 import { SignIn } from "@clerk/nextjs";
 import { Logo } from "@/components/layout/logo";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
+import { PreviewLoginButtons } from "@/components/preview/PreviewLoginButtons";
+import { previewLoginEnabled, previewPersonaOptions } from "@/lib/previewLogin";
 
 export default function SignInPage() {
   return (
@@ -11,6 +13,7 @@ export default function SignInPage() {
         <LanguageSwitcher />
       </div>
       <Logo size="lg" />
+      {previewLoginEnabled() && <PreviewLoginButtons options={previewPersonaOptions()} />}
       <SignIn
         forceRedirectUrl="/onboarding/post-signup"
         appearance={{

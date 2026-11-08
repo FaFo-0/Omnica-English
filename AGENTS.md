@@ -14,7 +14,7 @@ Online English academy **Omnica English** (omnicaenglish.com) — website, stude
 ## Workflow (FaFo's — do not impose your own)
 
 1. **No phases, no steps, no roadmaps, no audit reports.** FaFo opens a page, dumps what he wants changed, you change it. Make routine calls yourself; ask only when readings genuinely diverge.
-2. **Always ship at the end of every task, without asking:** `npx convex deploy` (backend does NOT auto-deploy), then commit + `git push origin master` (Vercel builds frontend). Backend first so new UI never runs against old functions. Flag destructive schema changes in the summary, but ship.
+2. **Preview, then ship.** Live site has real students. Work on a branch: commit, `npm run push:dev` if `convex/` changed (uploads the branch backend to dev Convex), push the branch. Vercel builds a login-protected preview wired to dev Convex + dev Clerk with one-tap **Test as…** role buttons — send FaFo the branch preview link (`omnica-english-git-<branch>-fafo-s-projects.vercel.app`). When FaFo says **ship**: `npx convex deploy` first (backend does NOT auto-deploy; new UI must never run against old functions), then merge to `master` and push (Vercel builds production). Flag destructive schema changes before shipping. FaFo may say "ship directly" for tiny copy/style fixes.
 3. Build now, test at the very end. Mobile pass dead last. i18n fix deliberately last.
 4. **Browser verification is FaFo’s responsibility.** Do not run browser QA unless FaFo explicitly asks for it.
    When explicitly requested, reuse fictional QA actors via `npm run qa:setup` and `node scripts/dev-login.mjs admin|teacher|student|student-kk`; never use production for routine QA. See MASTER_PLAN §4/§5 for isolation and external-service limits.
