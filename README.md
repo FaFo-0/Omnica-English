@@ -10,10 +10,10 @@ Online English academy at [omnicaenglish.com](https://omnicaenglish.com): public
 | Styling | Tailwind CSS v4 + shadcn/ui |
 | Backend / DB / Realtime / Storage | Convex |
 | Authentication | Clerk (JWT → Convex) |
-| i18n | next-intl (EN / RU / AR with RTL; Kazakh in Phase 6) |
+| i18n | next-intl (EN / RU / AR with RTL / KK) |
 | Transcription | Soniox `stt-rt-v4` (real-time, speaker diarization) |
 | LLM | OpenRouter → DeepSeek V4.1 Flash (via Convex actions) |
-| Fonts | Plus Jakarta Sans + Noto Sans Arabic |
+| Fonts | Inter + Noto Sans Arabic |
 | Icons | Lucide React |
 | Tables | `@tanstack/react-table` |
 | Charts | `recharts` |
@@ -41,7 +41,10 @@ OPENROUTER_API_KEY=
 
 - **`MASTER_PLAN.md`** — platform reference: what exists, standing rules, known-issues queue, deployment. Read first.
 - **`POLICY.md`** — business policy (payments, cancellation, no-show, pauses, trials).
-- **`CLAUDE.md`** — AI agent behavior rules.
+- **`CLAUDE.md`** — rules for every AI working here (workflow, preview → ship).
+- **`docs/CHANGELOG.md`** — what changed, newest first.
+
+Marketing files (Instagram, video) live in [`FaFo-0/omnica-english-marketing`](https://github.com/FaFo-0/omnica-english-marketing).
 
 ## Ownership
 Mustafa
