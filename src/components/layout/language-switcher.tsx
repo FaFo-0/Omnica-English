@@ -15,6 +15,8 @@ type LanguageSelectControlProps<T extends string> = {
   onChange: (value: T) => void;
   options: readonly LanguageSelectOption<T>[];
   ariaLabel: string;
+  /** Visible short label next to the globe (e.g. "RU"); icon-only when omitted. */
+  label?: string;
 };
 
 export function LanguageSelectControl<T extends string>({
@@ -22,10 +24,12 @@ export function LanguageSelectControl<T extends string>({
   onChange,
   options,
   ariaLabel,
+  label,
 }: LanguageSelectControlProps<T>) {
   return (
-    <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-muted focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-purple-600">
+    <div className={`relative flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-full hover:bg-muted focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-purple-600 ${label ? "px-3" : "w-11"}`}>
       <Globe aria-hidden="true" className="h-5 w-5 text-foreground" />
+      {label && <span aria-hidden="true" className="text-sm font-bold">{label}</span>}
       <select
         value={value}
         onChange={(event) => onChange(event.target.value as T)}
