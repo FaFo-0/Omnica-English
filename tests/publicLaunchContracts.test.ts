@@ -175,3 +175,11 @@ test("WhatsApp messages are pre-typed only on number links; short links and non-
   assert.equal(whatsappHref("https://evil.example/77066993942", message), null);
   assert.equal(whatsappHref(undefined, message), null);
 });
+
+test("the teacher invite token never leaves the server through general settings queries", () => {
+  const settings = source("convex/tenantSettings.ts");
+  assert.doesNotMatch(settings, /export const getByOrgId/, "unauthenticated full-settings query must not come back");
+  const getActive = settings.match(/export const getActive = query\([\s\S]*?\n\}\);/)?.[0] ?? "";
+  assert.match(getActive, /teacherInviteToken: _inviteToken, \.\.\.visible/);
+  assert.doesNotMatch(getActive, /\.\.\.settings,/);
+});

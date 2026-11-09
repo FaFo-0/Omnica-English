@@ -198,9 +198,14 @@ export const getActive = query({
       .withIndex("by_organization", (q) => q.eq("organizationId", ACADEMY_ID))
       .unique();
     if (!settings) return null;
+    // Every signed-in user (students too) reads this. The invite token lets
+    // anyone join as a teacher, so it never leaves the server here; admins
+    // read it through getTeacherInviteToken.
+    const { teacherInviteToken: _inviteToken, ...visible } = settings;
+    void _inviteToken;
     // Backfill Phase-H optional fields for rows seeded pre-H.
     return {
-      ...settings,
+      ...visible,
       supportWhatsappUrl: settings.supportWhatsappUrl ?? OMNICA_ENGLISH_DEFAULTS.supportWhatsappUrl,
       activityTypes: settings.activityTypes ?? DEFAULT_ACTIVITY_TYPES,
       trialPolicy: DEFAULT_TRIAL_POLICY,
@@ -235,18 +240,6 @@ export const getPublicLaunchInfo = query({
         durationDays: trial.durationDays,
       },
     };
-  },
-});
-
-export const getByOrgId = query({
-  args: { organizationId: v.string() },
-  handler: async (ctx, { organizationId }) => {
-    return await ctx.db
-      .query("tenantSettings")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", organizationId)
-      )
-      .unique();
   },
 });
 
