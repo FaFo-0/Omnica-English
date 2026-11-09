@@ -17,7 +17,7 @@ export type LandingCopy = {
   language: string; currency: string; home: string; signIn: string; register: string;
   navPrograms: string; navLesson: string; navPlatform: string; navPrices: string; navFaq: string;
   eyebrow: string; heroA: string; heroB: string; hero: string;
-  ctaTrial: string; ctaWhatsapp: string; whatsapp: string; heroFacts: readonly string[];
+  ctaTrial: string; ctaTelegram: string; selfSignup: string; waTrial: string; waQuestion: string; whatsapp: string; heroFacts: readonly string[];
   illustration: string; mockHello: string; mockNext: string; mockWhen: string; mockTopic: string; mockJoin: string; mockDue: string; mockStudy: string; mockStreak: string; mockWords: string; mockHomework: string; mockHomeworkDone: string;
   programsEyebrow: string; programsTitle: string; programsText: string;
   programs: readonly { title: string; tag: string; forWhom: string; items: readonly string[] }[];
@@ -45,7 +45,8 @@ const ru: LandingCopy = {
   eyebrow: "Онлайн-школа английского",
   heroA: "Индивидуальные уроки", heroB: "английского",
   hero: "Грамматика, курс по учебнику English File и разговорная практика — один на один с преподавателем. А между уроками всё, что вы прошли, ждёт вас в личном кабинете: слова, конспекты и домашние задания.",
-  ctaTrial: "Записаться на пробный урок", ctaWhatsapp: "Написать в WhatsApp", whatsapp: "Написать нам в WhatsApp",
+  ctaTelegram: "Написать в Telegram", selfSignup: "Хотите сами? Зарегистрируйтесь на сайте", waTrial: "Здравствуйте! Пишу с сайта, хочу записаться на пробный урок английского.", waQuestion: "Здравствуйте! Пишу с сайта, хочу узнать про уроки английского.",
+  ctaTrial: "Записаться на пробный урок",  whatsapp: "Написать нам в WhatsApp",
   heroFacts: ["Один на один", "60 минут в Google Meet", "Любой уровень, от нуля"],
   illustration: "Так выглядит личный кабинет ученика — иллюстрация",
   mockHello: "Привет, Анна!", mockNext: "Следующий урок", mockWhen: "Вторник, 19:00", mockTopic: "English File · Present perfect", mockJoin: "Войти в урок", mockDue: "Карточек на сегодня", mockStudy: "Повторить", mockStreak: "дней подряд", mockWords: "слов в словаре", mockHomework: "Домашнее задание", mockHomeworkDone: "Проверено: 9 из 10",
@@ -88,7 +89,7 @@ const ru: LandingCopy = {
     ["Какой нужен уровень?", "Любой. Можно начать с нуля. Уровень определим на пробном уроке и подберём программу."],
     ["Вы занимаетесь по учебнику?", "Да, для общего курса — по English File. Для разговорной практики и грамматики преподаватель подбирает материалы под вашу цель."],
     ["Как проходит пробный урок?", "Это обычный урок на час: знакомство, определение уровня и обсуждение цели. Если формат не подойдёт, продолжать не обязательно."],
-    ["Как оплатить?", "Зарегистрируйтесь и выберите пакет. Мы напишем вам в WhatsApp и договоримся об удобном способе оплаты."],
+    ["Как оплатить?", "Напишите нам в WhatsApp или Telegram: договоримся о времени урока и удобном способе оплаты, а потом пришлём ссылку для регистрации в личном кабинете."],
     ["Что если я не смогу прийти?", "Перенесите урок в кабинете, если до начала больше 6 часов. Отменить с возвратом урока на баланс можно тоже за 6 часов — до двух раз за 30 дней."],
     ["Сколько действует пакет?", "Срок указан на каждом пакете и считается с первого урока. Если уезжаете или болеете, пакет можно поставить на паузу."],
     ["Что нужно для урока?", "Компьютер или телефон с интернетом и наушники. Уроки проходят в Google Meet."],
@@ -105,7 +106,8 @@ const ar: LandingCopy = {
   eyebrow: "مدرسة إنجليزية عبر الإنترنت",
   heroA: "دروس إنجليزية", heroB: "فردية",
   hero: "القواعد، ومنهج English File، والمحادثة — مع معلم واحد لك وحدك. وبين الدروس تجد كل ما تعلمته في حسابك: الكلمات والملخصات والواجبات.",
-  ctaTrial: "احجز درسًا تجريبيًا", ctaWhatsapp: "راسلنا عبر واتساب", whatsapp: "راسلنا عبر واتساب",
+  ctaTelegram: "راسلنا عبر Telegram", selfSignup: "تفضّل التسجيل بنفسك؟ أنشئ حسابًا على الموقع", waTrial: "مرحبًا! أكتب من الموقع، أريد حجز درس تجريبي في الإنجليزية.", waQuestion: "مرحبًا! أكتب من الموقع، أريد معرفة المزيد عن دروس الإنجليزية.",
+  ctaTrial: "احجز درسًا تجريبيًا",  whatsapp: "راسلنا عبر واتساب",
   heroFacts: ["درس فردي", "60 دقيقة عبر Google Meet", "لأي مستوى، حتى من الصفر"],
   illustration: "هكذا يبدو حساب الطالب — رسم توضيحي",
   mockHello: "مرحبًا يا سارة!", mockNext: "الدرس القادم", mockWhen: "الثلاثاء، 19:00", mockTopic: "English File · Present perfect", mockJoin: "ادخل الدرس", mockDue: "بطاقات اليوم", mockStudy: "راجع", mockStreak: "يومًا متتاليًا", mockWords: "كلمة في قاموسك", mockHomework: "الواجب", mockHomeworkDone: "تم التصحيح: 9 من 10",
@@ -148,7 +150,7 @@ const ar: LandingCopy = {
     ["ما المستوى المطلوب؟", "أي مستوى، حتى من الصفر. سنحدد مستواك في الدرس التجريبي ونختار البرنامج."],
     ["هل تدرسون بكتاب؟", "نعم، في المنهج العام نستخدم English File. وفي المحادثة والقواعد يختار المعلم المواد حسب هدفك."],
     ["كيف يتم الدرس التجريبي؟", "إنه درس عادي مدته ساعة: تعارف وتحديد المستوى ومناقشة الهدف. وإن لم يناسبك الأسلوب فلا التزام عليك."],
-    ["كيف أدفع؟", "سجّل واختر باقة. سنراسلك عبر واتساب ونتفق على طريقة دفع مناسبة."],
+    ["كيف أدفع؟", "راسلنا عبر واتساب أو Telegram: نتفق على موعد الدرس وطريقة الدفع المناسبة، ثم نرسل لك رابط التسجيل في حسابك."],
     ["ماذا لو لم أستطع الحضور؟", "انقل الدرس من حسابك إذا بقي على بدايته أكثر من 6 ساعات. ويمكن إلغاؤه مع إعادته إلى رصيدك قبل 6 ساعات أيضًا — حتى مرتين خلال 30 يومًا."],
     ["ما مدة صلاحية الباقة؟", "الصلاحية مكتوبة على كل باقة وتُحسب من أول درس. إذا سافرت أو مرضت يمكنك إيقاف الباقة مؤقتًا."],
     ["ماذا أحتاج للدرس؟", "حاسوب أو هاتف متصل بالإنترنت وسماعات. تتم الدروس عبر Google Meet."],
@@ -165,7 +167,8 @@ const kk: LandingCopy = {
   eyebrow: "Ағылшын тілінің онлайн мектебі",
   heroA: "Ағылшын тілінен", heroB: "жеке сабақтар",
   hero: "Грамматика, English File оқулығы бойынша курс және сөйлеу практикасы — оқытушымен бетпе-бет. Ал сабақ арасында өткеннің бәрі жеке кабинетіңізде: сөздер, конспектілер және үй тапсырмалары.",
-  ctaTrial: "Сынақ сабағына жазылу", ctaWhatsapp: "WhatsApp-қа жазу", whatsapp: "Бізге WhatsApp арқылы жазу",
+  ctaTelegram: "Telegram-ға жазу", selfSignup: "Өзіңіз тіркелгіңіз келе ме? Сайтта тіркеліңіз", waTrial: "Сәлеметсіз бе! Сайттан жазып отырмын, сынақ сабағына жазылғым келеді.", waQuestion: "Сәлеметсіз бе! Сайттан жазып отырмын, ағылшын сабақтары туралы білгім келеді.",
+  ctaTrial: "Сынақ сабағына жазылу",  whatsapp: "Бізге WhatsApp арқылы жазу",
   heroFacts: ["Жеке сабақ", "Google Meet-те 60 минут", "Кез келген деңгей, нөлден бастап"],
   illustration: "Оқушының жеке кабинеті осылай көрінеді — иллюстрация",
   mockHello: "Сәлем, Айгерім!", mockNext: "Келесі сабақ", mockWhen: "Сейсенбі, 19:00", mockTopic: "English File · Present perfect", mockJoin: "Сабаққа кіру", mockDue: "Бүгінгі карточкалар", mockStudy: "Қайталау", mockStreak: "күн қатарынан", mockWords: "сөз сөздікте", mockHomework: "Үй тапсырмасы", mockHomeworkDone: "Тексерілді: 10-нан 9",
@@ -208,7 +211,7 @@ const kk: LandingCopy = {
     ["Қандай деңгей керек?", "Кез келген, нөлден бастауға болады. Деңгейді сынақ сабағында анықтап, бағдарлама таңдаймыз."],
     ["Оқулық бойынша оқисыздар ма?", "Иә, жалпы курста — English File бойынша. Сөйлеу мен грамматикада оқытушы материалды мақсатыңызға қарай таңдайды."],
     ["Сынақ сабағы қалай өтеді?", "Бұл кәдімгі бір сағаттық сабақ: танысу, деңгейді анықтау және мақсатты талқылау. Формат ұнамаса, жалғастыру міндетті емес."],
-    ["Қалай төлеймін?", "Тіркеліп, пакетті таңдаңыз. Біз WhatsApp-та жазып, ыңғайлы төлем тәсілін келісеміз."],
+    ["Қалай төлеймін?", "Бізге WhatsApp немесе Telegram-ға жазыңыз: сабақ уақыты мен ыңғайлы төлем тәсілін келісеміз, содан кейін жеке кабинетке тіркелу сілтемесін жібереміз."],
     ["Келе алмасам ше?", "Басталуына 6 сағаттан көп уақыт болса, сабақты кабинетте ауыстырыңыз. Сабақты балансқа қайтарып болдырмау да 6 сағат бұрын мүмкін — 30 күнде екі ретке дейін."],
     ["Пакет қанша уақыт жарамды?", "Мерзімі әр пакетте көрсетілген және бірінші сабақтан есептеледі. Сапарға шықсаңыз не ауырып қалсаңыз, пакетті тоқтатып қоюға болады."],
     ["Сабаққа не керек?", "Интернеті бар компьютер немесе телефон және құлаққап. Сабақтар Google Meet-те өтеді."],
@@ -225,7 +228,8 @@ const en: LandingCopy = {
   eyebrow: "Online English school",
   heroA: "One-to-one", heroB: "English lessons",
   hero: "Grammar, an English File course and speaking practice — with a teacher who works with you alone. Between lessons, everything you covered is waiting in your account: words, lesson notes and homework.",
-  ctaTrial: "Book a trial lesson", ctaWhatsapp: "Message on WhatsApp", whatsapp: "Message us on WhatsApp",
+  ctaTelegram: "Message on Telegram", selfSignup: "Prefer to do it yourself? Sign up on the site", waTrial: "Hi! I'm writing from the website — I'd like to book a trial English lesson.", waQuestion: "Hi! I'm writing from the website — I'd like to know more about your English lessons.",
+  ctaTrial: "Book a trial lesson",  whatsapp: "Message us on WhatsApp",
   heroFacts: ["One-to-one", "60 minutes on Google Meet", "Any level, from zero"],
   illustration: "What a student's account looks like — illustration",
   mockHello: "Hi, Anna!", mockNext: "Next lesson", mockWhen: "Tuesday, 7:00 pm", mockTopic: "English File · Present perfect", mockJoin: "Join lesson", mockDue: "Cards due today", mockStudy: "Review", mockStreak: "day streak", mockWords: "words saved", mockHomework: "Homework", mockHomeworkDone: "Checked: 9 of 10",
@@ -268,7 +272,7 @@ const en: LandingCopy = {
     ["What level do I need?", "Any — you can start from zero. We'll check your level in the trial lesson and pick a program."],
     ["Do you use a textbook?", "Yes, the general course follows English File. For speaking and grammar, your teacher chooses materials for your goal."],
     ["What happens in the trial lesson?", "It's a normal one-hour lesson: getting to know you, checking your level and talking about your goal. No obligation to continue."],
-    ["How do I pay?", "Sign up and choose a pack. We'll message you on WhatsApp to agree on a convenient way to pay."],
+    ["How do I pay?", "Message us on WhatsApp or Telegram: we'll agree on a lesson time and a convenient way to pay, then send you a link to set up your account."],
     ["What if I can't make it?", "Move the lesson in your account if it's more than 6 hours away. Cancelling with the lesson returned also needs 6 hours' notice — up to twice in 30 days."],
     ["How long is a pack valid?", "Each pack shows its validity, counted from your first lesson. Travelling or ill? You can pause the pack."],
     ["What do I need for a lesson?", "A computer or phone with internet, and headphones. Lessons are on Google Meet."],

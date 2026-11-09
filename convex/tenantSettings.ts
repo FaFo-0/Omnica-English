@@ -150,7 +150,7 @@ const OMNICA_ENGLISH_DEFAULTS = {
   logoDarkUrl: "/brand/tenant/logo-dark.svg",
   faviconUrl: "/brand/tenant/favicon.svg",
   supportEmail: "hello@omnica.app",
-  supportWhatsappUrl: "https://wa.me/message/7M72VAH5Z4Z4C1",
+  supportWhatsappUrl: "https://wa.me/77066993942",
   websiteUrl: "https://omnica.app",
 
   primaryColor: "#6716A4",

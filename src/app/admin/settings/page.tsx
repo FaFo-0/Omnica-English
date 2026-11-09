@@ -155,6 +155,8 @@ function TeacherInviteSection() {
 function BrandingSection({ settings, update }: { settings: any; update: any }) {
   const [name, setName] = useState("");
   const [primary, setPrimary] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [telegram, setTelegram] = useState("");
   const [features, setFeatures] = useState({
     gamification: true,
     achievements: true,
@@ -166,13 +168,19 @@ function BrandingSection({ settings, update }: { settings: any; update: any }) {
     if (!settings) return;
     setName(settings.name ?? "");
     setPrimary(settings.primaryColor ?? "#6716A4");
+    setWhatsapp(settings.supportWhatsappUrl ?? "");
+    setTelegram(settings.supportTelegramUrl ?? "");
     if (settings.features) setFeatures({ ...features, ...settings.features });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings?._id]);
 
   async function save() {
+    const wa = whatsapp.trim();
+    const tg = telegram.trim();
+    if (wa && !/^https:\/\/wa\.me\/\S+$/.test(wa)) { toast.error("WhatsApp link must start with https://wa.me/"); return; }
+    if (tg && !/^https:\/\/t\.me\/\S+$/.test(tg)) { toast.error("Telegram link must start with https://t.me/"); return; }
     try {
-      await update({ patch: { name, primaryColor: primary, features } });
+      await update({ patch: { name, primaryColor: primary, features, supportWhatsappUrl: wa || undefined, supportTelegramUrl: tg || undefined } });
       toast.success("Branding saved");
     } catch (e) {
       toast.error((e as Error).message);
@@ -205,6 +213,15 @@ function BrandingSection({ settings, update }: { settings: any; update: any }) {
         {/* Only a stored upload counts as "the tenant's logo" — the seeded
             logoUrl points at a repo asset, same as the bundled mark. */}
         <LogoUploader logoUrl={settings?.logoStorageId ? settings.logoUrl : null} />
+        <div>
+          <label className="label" style={{ display: "block", marginBottom: 4 }}>WhatsApp link</label>
+          <input className="input" dir="ltr" inputMode="url" placeholder="https://wa.me/77001234567" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} />
+          <p className="body-sm" style={{ marginTop: 4, color: "var(--omnic-gray-400)" }}>Use the number form (wa.me/7…) so the website can pre-type messages.</p>
+        </div>
+        <div>
+          <label className="label" style={{ display: "block", marginBottom: 4 }}>Telegram link</label>
+          <input className="input" dir="ltr" inputMode="url" placeholder="https://t.me/your_name" value={telegram} onChange={(e) => setTelegram(e.target.value)} />
+        </div>
       </div>
       <div style={{ marginTop: 16 }}>
         <label className="label" style={{ display: "block", marginBottom: 8 }}>Feature Toggles</label>

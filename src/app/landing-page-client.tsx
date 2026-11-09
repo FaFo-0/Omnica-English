@@ -5,17 +5,18 @@ import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "convex-helpers/react/cache/hooks";
-import { ArrowRight, Banknote, BarChart3, BellRing, BookMarked, CalendarDays, Check, ChevronDown, Flame, Languages, MessagesSquare, PenLine, Video } from "lucide-react";
+import { Banknote, BarChart3, BellRing, BookMarked, CalendarDays, Check, ChevronDown, Flame, Languages, MessagesSquare, PenLine, Video } from "lucide-react";
 import { api } from "@convex";
 import { PublicPlanCard } from "@/components/billing/PublicPlanCard";
 import { LanguageSelectControl } from "@/components/layout/language-switcher";
 import { TenantPublicLogo } from "@/components/public/tenant-logo";
 import { FlashcardDemo, NotesDemo, QuizDemo, ReadingDemo } from "@/components/public/landing-demos";
+import { whatsappHref } from "@/lib/whatsapp";
 import { parseAttribution, storeAttribution, withAttribution } from "@/lib/attribution";
 import { LANDING_COPY, PUBLIC_LANGUAGE_OPTIONS, type LandingCopy } from "@/lib/publicLandingCopy";
 import { buildLandingLanguageHref, buildPublicHref, resolveLandingLocale, type PublicLandingLocale } from "@/lib/publicLandingLocale";
 
-const WHATSAPP = "https://wa.me/message/7M72VAH5Z4Z4C1";
+const WHATSAPP = "https://wa.me/77066993942";
 const CURRENCY_KEY = "omnica-currency";
 /** The currency a visitor most likely pays in, until they pick one. Ignored when that currency isn't enabled in billing. */
 const LOCALE_CURRENCY: Record<PublicLandingLocale, string> = { ru: "KZT", kk: "KZT", ar: "SAR", en: "USD" };
@@ -87,6 +88,9 @@ export function LandingPageClient() {
   const primary = launchInfo?.primaryColor ?? "#6716A4";
   const supportEmail = launchInfo?.supportEmail;
   const whatsappUrl = launchInfo?.supportWhatsappUrl ?? WHATSAPP;
+  const waTrialHref = whatsappHref(whatsappUrl, copy.waTrial) ?? whatsappUrl;
+  const waQuestionHref = whatsappHref(whatsappUrl, copy.waQuestion) ?? whatsappUrl;
+  const telegramUrl = launchInfo?.supportTelegramUrl;
   const homeHref = buildLandingLanguageHref(locale, searchParams);
 
   useEffect(() => { storeAttribution(attribution); }, [attribution]);
@@ -117,7 +121,7 @@ export function LandingPageClient() {
             {enabledCurrencies.length > 1 && <LanguageSelectControl value={currency} onChange={setCurrency} options={enabledCurrencies.map((code) => ({ value: code, label: `${code} · ${currencySymbol(code)}` }))} ariaLabel={copy.currency} label={currency} icon={<Banknote aria-hidden="true" className="h-5 w-5" />} />}
             <LanguageSelectControl value={locale} onChange={(nextLocale) => router.push(buildLandingLanguageHref(nextLocale, searchParams))} options={PUBLIC_LANGUAGE_OPTIONS} ariaLabel={copy.language} label={locale.toUpperCase()} />
             <Link href={`/sign-in?lang=${locale}`} className="whitespace-nowrap rounded-full px-2.5 py-2 text-sm font-semibold hover:bg-[#281640]/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600">{copy.signIn}</Link>
-            <Link href={signupHref} className="ms-1 hidden rounded-full bg-[#26143f] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#4b2774] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600 md:inline-flex">{copy.register}</Link>
+            <a href={waTrialHref} target="_blank" rel="noopener noreferrer" className="ms-1 hidden items-center gap-2 rounded-full bg-[#1f9d55] hover:bg-[#17803f] px-4 py-2.5 text-sm font-bold text-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600 md:inline-flex"><WhatsAppIcon size={17} />{copy.register}</a>
           </div>
         </div>
       </header>
@@ -130,10 +134,11 @@ export function LandingPageClient() {
             <h1 id="hero-heading" className="mt-5 text-[clamp(2.5rem,10vw,5.25rem)] font-black leading-[1] tracking-[-.05em]">{copy.heroA}<br /><span className="relative inline-block" style={{ color: primary }}>{copy.heroB}<span aria-hidden="true" className="absolute inset-x-0 -bottom-1 -z-10 h-4 rounded-full bg-[#ffca00] sm:h-5" /></span></h1>
             <p className="mt-6 max-w-xl text-lg leading-[1.65] text-[#4c4558] sm:text-xl">{copy.hero}</p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <Link href={signupHref} className="inline-flex min-h-14 items-center justify-center gap-3 rounded-full bg-[#26143f] px-8 font-bold text-white shadow-[0_12px_30px_-10px_#26143f] transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-purple-600">{copy.ctaTrial}<ArrowRight size={18} className="rtl:rotate-180" aria-hidden="true" /></Link>
-              <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full border-2 border-[#26143f]/15 bg-white px-7 font-bold text-[#17703d] transition-colors hover:border-[#1f9d55] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600"><WhatsAppIcon />{copy.ctaWhatsapp}</a>
+              <a href={waTrialHref} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-14 items-center justify-center gap-3 rounded-full bg-[#1f9d55] hover:bg-[#17803f] px-8 font-bold text-white shadow-[0_12px_30px_-12px_#17803f] transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-purple-600"><WhatsAppIcon size={22} />{copy.ctaTrial}</a>
+              {telegramUrl && <a href={telegramUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full border-2 border-[#26143f]/15 bg-white px-7 font-bold text-[#1f6fa8] transition-colors hover:border-[#229ed9] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M21.94 4.3 18.6 20.05c-.25 1.11-.91 1.39-1.84.86l-5.08-3.74-2.45 2.36c-.27.27-.5.5-1.02.5l.36-5.18 9.43-8.52c.41-.36-.09-.57-.64-.2L5.7 13.5.68 11.93c-1.09-.34-1.11-1.09.23-1.62L20.5 2.76c.91-.33 1.7.21 1.44 1.54Z" /></svg>{copy.ctaTelegram}</a>}
             </div>
-            <ul className="mt-8 flex flex-wrap gap-2">{copy.heroFacts.map((fact) => <li key={fact} className="rounded-full border border-[#26143f]/12 bg-white px-3.5 py-1.5 text-sm font-bold text-[#3d3449]">{fact}</li>)}</ul>
+            <Link href={signupHref} className="mt-4 inline-block text-sm font-bold text-[#4c4558] underline underline-offset-4 hover:text-[#26143f]">{copy.selfSignup}</Link>
+            <ul className="mt-6 flex flex-wrap gap-2">{copy.heroFacts.map((fact) => <li key={fact} className="rounded-full border border-[#26143f]/12 bg-white px-3.5 py-1.5 text-sm font-bold text-[#3d3449]">{fact}</li>)}</ul>
           </div>
           <AccountMock copy={copy} />
         </div>
@@ -236,8 +241,9 @@ export function LandingPageClient() {
           <div className="relative grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
             <div><h2 id="final-heading" className="max-w-2xl text-4xl font-black tracking-[-.04em] sm:text-6xl">{copy.finalTitle}</h2><p className="mt-5 max-w-xl text-lg leading-8 text-[#3d2f10]">{copy.finalText}</p></div>
             <div className="flex flex-col gap-3">
-              <Link href={signupHref} className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#26143f] px-8 text-center font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600">{copy.start}<ArrowRight size={18} className="rtl:rotate-180" aria-hidden="true" /></Link>
-              <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" aria-label={copy.whatsapp} className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full border-2 border-[#26143f] px-8 text-center font-bold text-[#26143f] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600"><WhatsAppIcon />{copy.ctaWhatsapp}</a>
+              <a href={waTrialHref} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#1f9d55] hover:bg-[#17803f] px-8 text-center font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600"><WhatsAppIcon size={22} />{copy.start}</a>
+              {telegramUrl && <a href={telegramUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full border-2 border-[#26143f] px-8 text-center font-bold text-[#26143f] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M21.94 4.3 18.6 20.05c-.25 1.11-.91 1.39-1.84.86l-5.08-3.74-2.45 2.36c-.27.27-.5.5-1.02.5l.36-5.18 9.43-8.52c.41-.36-.09-.57-.64-.2L5.7 13.5.68 11.93c-1.09-.34-1.11-1.09.23-1.62L20.5 2.76c.91-.33 1.7.21 1.44 1.54Z" /></svg>{copy.ctaTelegram}</a>}
+              <Link href={signupHref} className="text-center text-sm font-bold text-[#26143f] underline underline-offset-4">{copy.selfSignup}</Link>
             </div>
           </div>
         </div>
@@ -246,7 +252,7 @@ export function LandingPageClient() {
       <footer className="border-t border-[#26143f]/10 bg-white px-4 pb-24 pt-10 sm:px-8 sm:pb-10"><div className="mx-auto flex max-w-7xl flex-col gap-7 sm:flex-row sm:items-center sm:justify-between"><div className="flex min-w-0 items-center gap-3 font-black"><TenantPublicLogo logoUrl={launchInfo?.logoUrl} name={name} size={34} className="rounded-lg" /></div><nav className="flex flex-wrap gap-x-5 gap-y-3 text-sm font-semibold" aria-label={copy.legal}><Link href={buildPublicHref("/privacy", locale, searchParams)} className="hover:underline">{copy.privacy}</Link><Link href={buildPublicHref("/terms", locale, searchParams)} className="hover:underline">{copy.terms}</Link>{supportEmail && <a href={`mailto:${supportEmail}`} className="break-all hover:underline">{copy.email}: {supportEmail}</a>}<a href={whatsappUrl} className="hover:underline" target="_blank" rel="noopener noreferrer">WhatsApp</a>{launchInfo?.supportTelegramUrl && <a href={launchInfo.supportTelegramUrl} className="hover:underline" target="_blank" rel="noopener noreferrer">Telegram</a>}<a href="#top" className="hover:underline">{copy.back}</a></nav></div></footer>
 
       {/* Floating WhatsApp: always one tap away. */}
-      <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" aria-label={copy.whatsapp} title={copy.whatsapp} className="fixed bottom-5 end-5 z-50 grid h-14 w-14 place-items-center rounded-full bg-[#25d366] text-white shadow-[0_10px_30px_-8px_#0a5c2d99] transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-purple-600">
+      <a href={waQuestionHref} target="_blank" rel="noopener noreferrer" aria-label={copy.whatsapp} title={copy.whatsapp} className="fixed bottom-5 end-5 z-50 grid h-14 w-14 place-items-center rounded-full bg-[#25d366] text-white shadow-[0_10px_30px_-8px_#0a5c2d99] transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-purple-600">
         <WhatsAppIcon size={28} />
       </a>
     </main>

@@ -135,7 +135,7 @@ test("public catalogue is academy-scoped, branding preserves supplied artwork wi
 
 test("WhatsApp keeps its exact deep link while visible and accessible labels are localized; no public payment instructions", () => {
   const landing = source("src/app/landing-page-client.tsx");
-  assert.match(landing, /const WHATSAPP = "https:\/\/wa\.me\/message\/7M72VAH5Z4Z4C1"/);
+  assert.match(landing, /const WHATSAPP = "https:\/\/wa\.me\/77066993942"/);
   assert.match(landing, /supportWhatsappUrl \?\? WHATSAPP/);
   assert.match(landing, /className="fixed bottom-5 end-5[^"]*"/, "floating WhatsApp button stays on the page");
   assert.doesNotMatch(landing, /Kaspi|CreditCard/);
@@ -163,4 +163,15 @@ test("sign-in, onboarding trial and referral boundaries remain intact", () => {
   assert.equal(cleanReferralSource("x".repeat(3_000)), "x".repeat(2_048));
   assert.equal(trialGrantExpiry(0, Date.UTC(2026, 8, 28)), undefined);
   assert.equal(trialGrantExpiry(7, Date.UTC(2026, 8, 28)), "2026-10-05");
+});
+
+test("WhatsApp messages are pre-typed only on number links; short links and non-WhatsApp URLs are left alone", async () => {
+  const { whatsappHref, packWhatsappMessage } = await import("../src/lib/whatsapp.ts");
+  const message = packWhatsappMessage("ru", "8 уроков", "44 800 ₸");
+  assert.equal(message, "Здравствуйте! Хочу оформить пакет «8 уроков» — 44 800 ₸.");
+  assert.equal(whatsappHref("https://wa.me/77066993942", message), `https://wa.me/77066993942?text=${encodeURIComponent(message)}`);
+  assert.doesNotMatch(whatsappHref("https://wa.me/77066993942", message) ?? "", /\+/, "no form-encoded spaces");
+  assert.equal(whatsappHref("https://wa.me/message/7M72VAH5Z4Z4C1", message), "https://wa.me/message/7M72VAH5Z4Z4C1");
+  assert.equal(whatsappHref("https://evil.example/77066993942", message), null);
+  assert.equal(whatsappHref(undefined, message), null);
 });

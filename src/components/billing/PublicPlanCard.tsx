@@ -5,6 +5,7 @@ import { Check, ArrowUpRight } from "lucide-react";
 import type { CataloguePackOffer } from "../../../convex/lib/pricingCatalogue";
 import { formatLessonCount as lessonLabel, isLessonCountTitle } from "../../../convex/lib/lessonLabels";
 import { currencyDigits } from "../../../convex/lib/money";
+import { packWhatsappMessage, whatsappHref } from "@/lib/whatsapp";
 
 const accent = "var(--public-accent, var(--brand-purple, #6716A4))";
 const words = {
@@ -13,14 +14,8 @@ const words = {
   kk: { signup: "Тіркелу", choose: "Пакетті таңдау", whatsapp: "WhatsApp арқылы сұрау", payment: "Төлем WhatsApp арқылы келісіледі.", off: (n: string) => `${n}% жеңілдік`, validity: (n: string) => `Алғаш пайдаланғаннан бастап ${n} күн` },
   ar: { signup: "إنشاء حساب", choose: "اختر الباقة", whatsapp: "اسأل عبر واتساب", payment: "يتم ترتيب الدفع عبر واتساب.", off: (n: string) => `خصم ${n}٪`, validity: (n: string) => `صالح لمدة ${n} يومًا من أول استخدام` },
 };
-function contactHref(value: string | undefined, offer: CataloguePackOffer, price: string) {
-  if (!value) return null;
-  try {
-    const url = new URL(value);
-    if (url.protocol !== "https:" || url.hostname !== "wa.me") return null;
-    if (/^\/\d+\/?$/.test(url.pathname)) url.searchParams.set("text", `${offer.name} — ${price}`);
-    return url.href;
-  } catch { return null; }
+function contactHref(value: string | undefined, offer: CataloguePackOffer, price: string, locale: string) {
+  return whatsappHref(value, packWhatsappMessage(locale, offer.name, price));
 }
 function signupHref(value: string | undefined, offer: CataloguePackOffer) {
   if (!value) return undefined;
@@ -49,7 +44,7 @@ export function PublicPlanCard({ offer, locale, primaryHref, onChoose, primaryLa
   const money = (amount: number) => new Intl.NumberFormat(lang, { style: "currency", currency: offer.currency, currencyDisplay: "narrowSymbol", minimumFractionDigits: Number.isInteger(amount) ? 0 : currencyDigits(offer.currency), maximumFractionDigits: currencyDigits(offer.currency) }).format(amount);
   const price = money(offer.netPrice);
   const percentage = (offer as CataloguePackOffer & { salePercent?: number }).salePercent ?? (offer.listPrice > 0 ? Math.round((1 - offer.netPrice / offer.listPrice) * 100) : 0);
-  const contact = contactHref(whatsappUrl, offer, price);
+  const contact = contactHref(whatsappUrl, offer, price, lang);
   const destination = signupHref(primaryHref, offer);
   const genericTitle = isLessonCountTitle(offer.name, offer.lessons);
   const primaryClass = `inline-flex min-h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-center text-sm font-bold text-white transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-purple-600 ${preview ? "" : "disabled:cursor-not-allowed disabled:opacity-50"}`;
