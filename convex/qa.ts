@@ -90,14 +90,31 @@ export const seed = internalMutation({
         if (key !== 'completed') continue;
         const existingLesson = await lessons.query().withIndex('by_organization_and_externalId', q => q.eq('organizationId', ACADEMY_ID).eq('externalId', externalId)).unique();
         const lessonId = existingLesson?._id ?? await lessons.insert({ externalId, teacherId: teacher.externalId, studentId: owner, title: 'QA · Market conversation', status: 'published', transcript: 'Teacher: What did you buy?\nStudent: I bought an apple and some bread.', summary: 'Practised shopping vocabulary and past tense.', contentStatus: { summary: 'approved', vocabulary: 'approved', flashcards: 'approved', quiz: 'approved' }, durationSeconds: 3600, order: 0, scheduleEventId: eventId, createdAt: now, publishedAt: now });
+        // One lesson-sourced card (translation + English definition + the
+        // sentence from the lesson), so QA and marketing captures show the
+        // real "word from your lesson" card back.
+        const lessonCardId = `qa:v1:${student.key}:lesson:buy`;
+        const lessonCard = existingCards.find(c => c.cardId === lessonCardId);
+        const lessonTranslation = student.locale === 'ru' ? 'покупать' : 'сатып алу';
+        if (lessonCard) {
+          if (replenish) await cards.patch(lessonCard._id, { nextReviewDate: date(0), isDeleted: false });
+        } else await cards.insert({ cardId: lessonCardId, deckId, ownerId: owner, front: 'buy', back: `${lessonTranslation} — to get something by paying for it`, translation: lessonTranslation, translationLocale: student.locale, exampleSentence: 'Yesterday I bought an apple and some bread.', sourceLessonId: lessonId, addedBy: 'teacher', interval: 0, easeFactor: 2.5, repetitions: 0, nextReviewDate: date(-1), lastReviewDate: null });
         const homework = tenantTable(ctx, ACADEMY_ID, 'homework');
         const existingHomework = await homework.query().withIndex('by_organization_and_studentId', q => q.eq('organizationId', ACADEMY_ID).eq('studentId', owner)).take(100);
         for (const state of ['assigned', 'submitted', 'reviewed'] as const) {
           const title = `QA · Market homework (${state})`;
-          if (!existingHomework.some(h => h.title === title)) await homework.insert({ lessonId, teacherId: teacher.externalId, studentId: owner, title, status: state,
-            contentJson: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Yesterday I ' }, { type: 'studentBlank', attrs: { label: 'past tense of buy', expected: 'bought', answer: state === 'assigned' ? '' : 'bought' } }, { type: 'text', text: ' an apple.' }] }] },
+          const contentJson = { type: 'doc', content: [
+            ['Yesterday I ', 'buy', 'bought', ' an apple at the market.'],
+            ['The seller ', 'be', 'was', ' very friendly.'],
+            ['I ', 'pay', 'paid', ' for the bread and walked home.'],
+          ].map(([before, verb, expected, after]) => ({ type: 'paragraph', content: [{ type: 'text', text: before }, { type: 'studentBlank', attrs: { label: `past tense of ${verb}`, expected, answer: state === 'assigned' ? '' : expected } }, { type: 'text', text: after }] })) };
+          const review = state === 'reviewed' ? { score: 3, maxScore: 3, teacherComment: 'Great work! All three past-tense forms are correct. Next time, try to use them when you speak, too.' } : {};
+          const existingRow = existingHomework.find(h => h.title === title);
+          // Replenish refreshes fixture content in place (keeps the row and its id).
+          if (existingRow) { if (replenish) await homework.patch(existingRow._id, { contentJson, ...review, updatedAt: now }); continue; }
+          await homework.insert({ lessonId, teacherId: teacher.externalId, studentId: owner, title, status: state, contentJson,
             assignedAt: now, dueAt: new Date(Date.now() + 7 * 86400000).toISOString(), dueDateMode: 'manual', createdAt: now, updatedAt: now,
-            ...(state !== 'assigned' ? { submittedAt: now } : {}), ...(state === 'reviewed' ? { reviewedAt: now, score: 1, maxScore: 1, teacherComment: 'Well done! Fictional QA feedback.' } : {}),
+            ...(state !== 'assigned' ? { submittedAt: now } : {}), ...(state === 'reviewed' ? { reviewedAt: now, ...review } : {}),
           });
         }
       }

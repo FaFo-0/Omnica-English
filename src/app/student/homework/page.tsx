@@ -60,7 +60,7 @@ export default function StudentHomeworkListPage() {
               h={h}
               subtitle={
                 h.maxScore
-                  ? t("score", { score: h.score ?? 0, max: h.maxScore }) +
+                  ? t.markup("score", { score: h.score ?? 0, max: h.maxScore, ratio: chunks => chunks }) +
                     (h.teacherComment ? t("hasFeedback") : "")
                   : h.teacherComment
                     ? t("reviewedFeedback")

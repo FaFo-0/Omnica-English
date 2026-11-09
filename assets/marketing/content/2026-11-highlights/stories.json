@@ -1,0 +1,48 @@
+{
+  "highlights": [
+    {
+      "slug": "1-start", "name": "Старт", "icon": "arrow-right",
+      "stories": [
+        { "id": "1-1", "bg": "purple", "title": ["Английский", "онлайн."], "accent": ["Один на один", "с преподавателем."], "visual": { "type": "mark" } },
+        { "id": "1-2", "bg": "cream", "title": ["Как это", "устроено"], "visual": { "type": "steps", "items": [["video", "Урок в Google Meet"], ["layers", "Новые слова — в карточках"], ["check-check", "Домашка — с проверкой"]] } },
+        { "id": "1-3", "bg": "cream", "title": ["Читать можно"], "accent": ["бесплатно."], "body": ["Библиотека и карточки —", "без покупки уроков."], "visual": { "type": "screenshot", "src": "library/screenshots/2026-11-09-phone-ru/01-library-catalogue.jpg", "crop": [335, 650] } },
+        { "id": "1-4", "bg": "yellow", "title": ["Попробуйте."], "accent": ["Запишитесь", "на пробный урок."], "visual": { "type": "link" } }
+      ]
+    },
+    {
+      "slug": "2-lessons", "name": "Уроки", "icon": "messages-square",
+      "stories": [
+        { "id": "2-1", "bg": "purple", "title": ["Вы и преподаватель."], "accent": ["Только вы двое."], "visual": { "type": "chat", "items": [["Вы", "How do I say…?"], ["Преподаватель", "Let’s try it together."]] } },
+        { "id": "2-2", "bg": "cream", "title": ["Новые слова —", "сразу в карточках."], "body": ["С переводом и примером", "из вашего урока."], "visual": { "type": "screenshot", "src": "library/screenshots/2026-11-09-phone-ru/06-flashcard-back-lesson.jpg", "crop": [190, 570], "width": 760 } },
+        { "id": "2-3", "bg": "cream", "title": ["Домашку проверяет", "преподаватель."], "body": ["Видно, где ошибка", "и как правильно."], "visual": { "type": "screenshot", "src": "library/screenshots/2026-11-09-phone-ru/07-homework-reviewed.jpg", "crop": [60, 485], "width": 640 } },
+        { "id": "2-4", "bg": "yellow", "title": ["Начните"], "accent": ["с пробного урока."], "visual": { "type": "link" } }
+      ]
+    },
+    {
+      "slug": "3-teachers", "name": "Преподаватели", "icon": "users",
+      "stories": [
+        { "id": "3-1", "bg": "purple", "title": ["Наши", "преподаватели"], "accent": ["из разных стран."], "visual": { "type": "icon", "name": "globe" } },
+        { "id": "3-2", "bg": "cream", "title": ["Кто будет", "вас учить"], "visual": { "type": "panels", "items": [["Носители языка", "Живой английский и разговорная практика."], ["Русскоязычные преподаватели", "Объяснят сложное по-русски."]] } },
+        { "id": "3-3", "bg": "cream", "title": ["Расскажите", "о своей цели —"], "accent": ["мы подберём", "преподавателя."], "visual": { "type": "icon", "name": "target" } },
+        { "id": "3-4", "bg": "yellow", "title": ["Познакомьтесь"], "accent": ["на пробном уроке."], "visual": { "type": "link" } }
+      ]
+    },
+    {
+      "slug": "4-library", "name": "Библиотека", "icon": "book-open",
+      "stories": [
+        { "id": "4-1", "bg": "purple", "title": ["Бесплатная", "библиотека"], "accent": ["на английском."], "visual": { "type": "icon", "name": "book-open" } },
+        { "id": "4-2", "bg": "cream", "title": ["Не знаете слово?"], "accent": ["Нажмите."], "body": ["Перевод — сразу."], "visual": { "type": "screenshot", "src": "library/screenshots/2026-11-09-phone-ru/02-reading-word-tap.jpg", "crop": [285, 560] } },
+        { "id": "4-3", "bg": "cream", "title": ["Сохраните —"], "accent": ["и повторяйте", "в карточках."], "visual": { "type": "screenshot", "src": "library/screenshots/2026-11-09-phone-ru/04-my-words.jpg", "crop": [55, 495], "width": 700 } },
+        { "id": "4-4", "bg": "yellow", "title": ["Регистрация —"], "accent": ["бесплатно."], "visual": { "type": "link" } }
+      ]
+    },
+    {
+      "slug": "5-prices", "name": "Цены", "icon": "tag",
+      "stories": [
+        { "id": "5-1", "bg": "yellow", "title": ["Начните", "с пробного урока."], "accent": ["Полноценный урок", "с преподавателем."], "visual": { "type": "icon", "name": "calendar-check", "circle": "#6716A4", "color": "#FFCA00" } },
+        { "id": "5-2", "bg": "cream", "title": ["Дальше —", "пакеты уроков."], "body": ["Выбирайте, сколько занятий", "вам удобно."], "visual": { "type": "icon", "name": "layers" } },
+        { "id": "5-3", "bg": "purple", "title": ["Цены — на сайте,"], "accent": ["для вашей страны."], "body": ["Оплата — через WhatsApp,", "мы поможем."], "visual": { "type": "link" } }
+      ]
+    }
+  ]
+}
