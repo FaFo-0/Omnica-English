@@ -10,6 +10,7 @@ import { normalizeLexeme } from "./lib/vocabularyIdentity";
 import {
   anchorTranscriptVocabularyCandidate,
   findTranscriptVocabularyUtterance,
+  noteVocabularyCandidateId,
   assertTranscriptAnchorIsRetained,
   resolveCandidateExternalId,
 } from "./lib/transcriptVocabularyCandidates";
@@ -98,6 +99,7 @@ export const replaceVocab = mutation({
       i += 1;
       let anchored: ReturnType<typeof anchorTranscriptVocabularyCandidate> | undefined;
       let sourceTranscriptVersion: number | undefined;
+      let noteCandidateId: string | undefined;
       let utterance = item.utteranceId
         ? await ctx.db.query("lessonTranscriptUtterances")
             .withIndex("by_lessonId_and_utteranceId", q =>
@@ -110,9 +112,13 @@ export const replaceVocab = mutation({
           item.word,
           utterance ? [utterance] : []
         ) ?? findTranscriptVocabularyUtterance(item.word, automaticUtterances);
-        if (!utterance) continue;
+        if (!utterance) {
+          // Not spoken, but kept when the teacher wrote it in the notes.
+          noteCandidateId = noteVocabularyCandidateId(lesson.externalId, item.word, lesson.teacherNotes);
+          if (!noteCandidateId) continue;
+        }
       }
-      if (item.utteranceId && !utterance) {
+      if (!generated && item.utteranceId && !utterance) {
         throw new Error("Transcript utterance not found for vocabulary candidate");
       }
       if (utterance) {
@@ -125,7 +131,7 @@ export const replaceVocab = mutation({
       }
 
       const externalId = (item.externalId && knownExistingIds.has(item.externalId)
-        ? item.externalId : anchored?.candidateId) ?? resolveCandidateExternalId({
+        ? item.externalId : anchored?.candidateId ?? noteCandidateId) ?? resolveCandidateExternalId({
         lessonExternalId: lesson.externalId,
         suppliedExternalId: item.externalId,
         knownExistingIds,
@@ -174,7 +180,7 @@ export const replaceVocab = mutation({
     }
 
     if (generated && retained.size === 0) {
-      throw new ConvexError("No generated words matched the recorded transcript. Your reviewed vocabulary was not changed. Please try again.");
+      throw new ConvexError("No generated words matched the recorded transcript or teacher notes. Your reviewed vocabulary was not changed. Please try again.");
     }
     for (const row of existing) {
       if (!retained.has(row.externalId)) await ctx.db.delete(row._id);
