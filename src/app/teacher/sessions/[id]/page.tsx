@@ -52,6 +52,8 @@ const SECTION_TO_PROMPT = {
   vocabulary: "vocab_extraction",
 } as const satisfies Record<Section, string>;
 
+const LEARNER_LANGUAGE_NAMES: Record<string, string> = { ru: "Russian", ar: "Arabic", kk: "Kazakh", en: "English" };
+
 const PARTS_OF_SPEECH = ["noun", "verb", "adjective", "adverb", "phrase", "pronoun", "preposition", "conjunction", "determiner", "interjection", "other"];
 
 export default function SessionReviewPage() {
@@ -112,19 +114,20 @@ export default function SessionReviewPage() {
     .filter(Boolean)
     .join("");
 
-  // Vocabulary extraction gets stable utterance IDs. The model may choose an
-  // ID, but the server later verifies the phrase against that utterance and
-  // copies the recorded context itself.
-  const vocabularyExtractionSource = [
-    utterances
-      .map((u) =>
-        `[${u.utteranceId}${u.speaker ? ` · ${u.speaker}` : ""}]: ${u.text}`
-      )
-      .join("\n\n"),
-    notes.trim() ? `--- Teacher Notes (guidance only; not student context) ---\n${notes.trim()}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n\n");
+  // Vocabulary extraction gets the teacher notes first (the strongest signal
+  // for what was taught), then stable utterance IDs. The model may choose an
+  // ID, but the server later verifies the phrase against that utterance (or
+  // the saved notes) and copies the recorded context itself.
+  const learnerLanguage = LEARNER_LANGUAGE_NAMES[learnerLocale ?? "ru"] ?? "Russian";
+  const buildVocabularySource = (lines: { utteranceId: string; speaker?: string; text: string }[]) => [
+    `Learner language for translations: ${learnerLanguage}`,
+    notes.trim()
+      ? `--- Teacher Notes (highest priority: include every English target word or phrase written here) ---\n${notes.trim()}`
+      : "--- Teacher Notes ---\n(none)",
+    `--- Lesson Conversation (ID-labelled utterances) ---\n${lines
+      .map((u) => `[${u.utteranceId}${u.speaker ? ` · ${u.speaker}` : ""}]: ${u.text}`)
+      .join("\n\n")}`,
+  ].join("\n\n");
 
   if (lesson === undefined) {
     return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
@@ -142,7 +145,11 @@ export default function SessionReviewPage() {
     // utterance rows are still missing (upload/interrupted-capture modes).
     // Normalize first — the manual-add message is only for a lesson with NO
     // transcript at all.
-    let vocabSource = vocabularyExtractionSource;
+    let vocabSource = buildVocabularySource(utterances);
+    // The server only keeps note-only words that are in the SAVED notes.
+    if (section === "vocabulary" && notes !== (lesson?.teacherNotes ?? "")) {
+      await saveTeacherNotes({ id: lessonId, teacherNotes: notes });
+    }
     if (section === "vocabulary" && utterances.length === 0) {
       if (!lesson?.transcript?.trim()) {
         toast.error("This recording has no structured transcript yet. Add vocabulary manually instead.");
@@ -152,9 +159,7 @@ export default function SessionReviewPage() {
       try {
         const res = await ensureUtterances({ id: lessonId });
         if (res.normalized && res.utterances) {
-          vocabSource = res.utterances
-            .map((u) => `[${u.utteranceId}]: ${u.text}`)
-            .join("\n\n");
+          vocabSource = buildVocabularySource(res.utterances);
         } else if (res.reason !== "already-normalized") {
           toast.error("Couldn't prepare the transcript structure — try again in a moment.");
           setPreparingTranscript(false);
@@ -217,9 +222,7 @@ export default function SessionReviewPage() {
           translation: typeof it.translation === "string" ? it.translation : "",
           definition: typeof it.definition === "string" ? it.definition : "",
           senseLabel: typeof it.senseLabel === "string" ? it.senseLabel : undefined,
-          translationLocale: (it.translationLocale === "en" || it.translationLocale === "ar" || it.translationLocale === "ru" || it.translationLocale === "kk"
-            ? it.translationLocale
-            : "ru") as "en" | "ru" | "ar" | "kk",
+          translationLocale: (learnerLocale ?? "ru") as "en" | "ru" | "ar" | "kk",
           partOfSpeech: typeof it.partOfSpeech === "string" ? it.partOfSpeech : undefined,
           utteranceId: typeof it.utteranceId === "string" ? it.utteranceId.trim() : "",
           included: true,
