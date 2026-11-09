@@ -76,6 +76,7 @@ import type * as lib_tenant from "../lib/tenant.js";
 import type * as lib_time from "../lib/time.js";
 import type * as lib_transcriptChunking from "../lib/transcriptChunking.js";
 import type * as lib_transcriptVocabularyCandidates from "../lib/transcriptVocabularyCandidates.js";
+import type * as lib_transcriptionLanguages from "../lib/transcriptionLanguages.js";
 import type * as lib_vocabulary from "../lib/vocabulary.js";
 import type * as lib_vocabularyIdentity from "../lib/vocabularyIdentity.js";
 import type * as lib_workbook from "../lib/workbook.js";
@@ -186,6 +187,7 @@ declare const fullApi: ApiFromModules<{
   "lib/time": typeof lib_time;
   "lib/transcriptChunking": typeof lib_transcriptChunking;
   "lib/transcriptVocabularyCandidates": typeof lib_transcriptVocabularyCandidates;
+  "lib/transcriptionLanguages": typeof lib_transcriptionLanguages;
   "lib/vocabulary": typeof lib_vocabulary;
   "lib/vocabularyIdentity": typeof lib_vocabularyIdentity;
   "lib/workbook": typeof lib_workbook;
