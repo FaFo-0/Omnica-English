@@ -13,7 +13,7 @@ export type AudioSource = "mic" | "tab" | "both";
 const DEFAULT_CONFIG: SonioxConfig = {
   getApiKey: async () => { throw new Error("getApiKey not configured"); },
   model: "stt-rt-v4",
-  languageHints: ["ar", "ru"],
+  languageHints: ["en", "ru", "ar"],
 };
 
 export type OnTokensCallback = (tokens: TranscriptToken[]) => void;

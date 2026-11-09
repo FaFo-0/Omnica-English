@@ -51,6 +51,7 @@ import { buildTranscript } from "@/lib/transcript";
 import { buildUtterances } from "@/lib/transcriptAnchors";
 import { readShareWindowState, shareWindowUrl } from "@/lib/shareWindowState";
 import Link from "next/link";
+import { transcriptionLanguageHints } from "../../../../../../convex/lib/transcriptionLanguages";
 
 const INTERACTION_PANEL_W = 480;
 
@@ -66,6 +67,7 @@ export default function LiveLessonPage() {
     if (lesson?.scheduleEventId && joinInfo === null) router.replace(`/teacher/sessions/${id}`);
   }, [lesson?.scheduleEventId, joinInfo, router, id]);
   const me = useQuery(api.users.getMe);
+  const learnerLocale = useQuery(api.users.getLearnerLocale, lesson ? { studentId: lesson.studentId } : "skip");
 
   const [interactionTab, setInteractionTab] = useState("reading");
   const [readingWorkId, setReadingWorkId] =
@@ -257,7 +259,7 @@ export default function LiveLessonPage() {
     setUploadEnding(true);
     toast.success(`File uploaded (${Math.round(durationSec / 60)} min). Transcribing…`);
     try {
-      const result = await transcribeAudioFile({ storageId });
+      const result = await transcribeAudioFile({ storageId, lessonId: id as Id<"lessons"> });
       const tokens = result.tokens;
       const text = buildTranscript(tokens).trim();
       if (!text) {
@@ -488,6 +490,7 @@ export default function LiveLessonPage() {
               savedRecordedSeconds={lesson.recordedSeconds ?? 0}
               onRecordedSeconds={setCapturedSeconds}
               onSessionStarted={setSessionStartedAt}
+              languageHints={transcriptionLanguageHints(learnerLocale)}
             />
             {lesson.transcript && (
               <div className="mt-6 rounded-xl border bg-card p-4">

@@ -58,6 +58,8 @@ interface RecordingPanelProps {
   savedRecordedSeconds?: number;
   /** Called with the total captured-audio seconds so the page can end cleanly. */
   onRecordedSeconds?: (seconds: number) => void;
+  /** Soniox language hints: English first, then the student's language. */
+  languageHints?: string[];
   /** Called with the session's durable start once recording begins. */
   onSessionStarted?: (sessionStartedAt: string | null) => void;
 }
@@ -71,6 +73,7 @@ export function RecordingPanel({
   savedRecordedSeconds = 0,
   onRecordedSeconds,
   onSessionStarted,
+  languageHints,
   ref,
 }: RecordingPanelProps) {
   const t = useTranslations("recording");
@@ -249,7 +252,7 @@ export function RecordingPanel({
     }
     if (audioFlushTimerRef.current) clearInterval(audioFlushTimerRef.current);
     clientRef.current?.cancel();
-    const client = new SonioxRecorder({ getApiKey: getSonioxKey });
+    const client = new SonioxRecorder({ getApiKey: getSonioxKey, ...(languageHints ? { languageHints } : {}) });
     clientRef.current = client;
 
     await client.start(

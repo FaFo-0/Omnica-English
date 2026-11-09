@@ -1,6 +1,8 @@
 import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { requireAuthAction } from "./lib/auth";
+import { api } from "./_generated/api";
+import { transcriptionLanguageHints } from "./lib/transcriptionLanguages";
 
 /**
  * Returns the Soniox API key from Convex environment variables.
@@ -26,9 +28,15 @@ export const getApiKey = action({
 export const transcribeAudioFile = action({
   args: {
     storageId: v.id("_storage"),
+    lessonId: v.optional(v.id("lessons")),
   },
-  handler: async (ctx, { storageId }) => {
+  handler: async (ctx, { storageId, lessonId }) => {
     await requireAuthAction(ctx);
+    const lesson = lessonId ? await ctx.runQuery(api.lessons.get, { id: lessonId }) : null;
+    const learnerLocale: string | null = lesson
+      ? await ctx.runQuery(api.users.getLearnerLocale, { studentId: lesson.studentId })
+      : null;
+    const languageHints = transcriptionLanguageHints(learnerLocale);
 
     const apiKey = process.env.SONIOX_API_KEY;
     if (!apiKey) {
@@ -70,7 +78,7 @@ export const transcribeAudioFile = action({
       body: JSON.stringify({
         model: "stt-async-v4",
         file_id: fileId,
-        language_hints: ["ar", "ru"],
+        language_hints: languageHints,
         enable_speaker_diarization: true,
       }),
     });
