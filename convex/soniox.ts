@@ -1,4 +1,5 @@
-import { action } from "./_generated/server";
+import { action, type ActionCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { requireAuthAction } from "./lib/auth";
 import { api } from "./_generated/api";
@@ -37,7 +38,17 @@ export const transcribeAudioFile = action({
       ? await ctx.runQuery(api.users.getLearnerLocale, { studentId: lesson.studentId })
       : null;
     const languageHints = transcriptionLanguageHints(learnerLocale);
+    return await transcribeStoredAudio(ctx, storageId, languageHints);
+  },
+});
 
+/** Soniox async transcription of a stored recording. Shared with the operator re-transcribe. */
+export async function transcribeStoredAudio(
+  ctx: ActionCtx,
+  storageId: Id<"_storage">,
+  languageHints: string[],
+  maxWaitMs = 5 * 60_000
+) {
     const apiKey = process.env.SONIOX_API_KEY;
     if (!apiKey) {
       throw new Error("SONIOX_API_KEY not configured.");
@@ -90,9 +101,9 @@ export const transcribeAudioFile = action({
 
     const { id: transcriptionId } = await transcribeRes.json();
 
-    // 4. Poll until complete (max ~5 minutes)
-    const maxAttempts = 60;
+    // 4. Poll until complete (maxWaitMs)
     const pollInterval = 5000; // 5 seconds
+    const maxAttempts = Math.ceil(maxWaitMs / pollInterval);
 
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise((resolve) => setTimeout(resolve, pollInterval));
@@ -151,6 +162,5 @@ export const transcribeAudioFile = action({
       }
     }
 
-    throw new Error("Transcription timed out after 5 minutes.");
-  },
-});
+    throw new Error(`Transcription timed out after ${Math.round(maxWaitMs / 60_000)} minutes.`);
+}

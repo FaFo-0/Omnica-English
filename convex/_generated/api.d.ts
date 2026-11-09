@@ -98,6 +98,7 @@ import type * as promptConfigs from "../promptConfigs.js";
 import type * as qa from "../qa.js";
 import type * as reports from "../reports.js";
 import type * as retention from "../retention.js";
+import type * as retranscribe from "../retranscribe.js";
 import type * as schedule from "../schedule.js";
 import type * as scheduleCron from "../scheduleCron.js";
 import type * as seed from "../seed.js";
@@ -209,6 +210,7 @@ declare const fullApi: ApiFromModules<{
   qa: typeof qa;
   reports: typeof reports;
   retention: typeof retention;
+  retranscribe: typeof retranscribe;
   schedule: typeof schedule;
   scheduleCron: typeof scheduleCron;
   seed: typeof seed;
