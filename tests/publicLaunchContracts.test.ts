@@ -50,9 +50,14 @@ test("complete public copy exists for three locales, including accessibility and
   const shellKeys = Object.keys(LEGAL_COPY.ru.shell).sort();
   for (const locale of ["ru", "kk", "en", "ar"] as const) {
     assert.deepEqual(Object.keys(LANDING_COPY[locale]).sort(), landingKeys);
-    for (const key of ["heroFacts", "pains", "steps", "between", "schoolPoints", "faq"] as const) {
+    for (const key of ["heroFacts", "programs", "flow", "cards", "tiles", "faq"] as const) {
       assert.equal(LANDING_COPY[locale][key].length, LANDING_COPY.ru[key].length, `${locale}.${key}`);
     }
+    assert.deepEqual(Object.keys(LANDING_COPY[locale].words).sort(), Object.keys(LANDING_COPY.ru.words).sort());
+    for (const program of LANDING_COPY[locale].programs) assert.equal(program.items.length, 3);
+  }
+  for (const word of Object.keys(LANDING_COPY.ru.words)) {
+    assert.match(source("src/components/public/landing-demos.tsx"), new RegExp(`\\[${word}\\]`), `reading demo sentence contains ${word}`);
   }
   for (const locale of ["ru", "kk", "en"] as const) {
     assert.deepEqual(Object.keys(LEGAL_COPY[locale].shell).sort(), shellKeys);
@@ -84,6 +89,7 @@ test("public rendering binds locale, catalogue, dynamic packs, conditional trial
   assert.match(landing, /dir=\{locale === "ar" \? "rtl" : "ltr"\}/);
   assert.match(shell, /<main lang=\{locale\}/);
   assert.match(landing, /group\.packs\.map/);
+  assert.match(landing, /<PublicPlanCard/, "landing prices use the billing catalogue's own card (same as the pack editor preview)");
   const card = source("src/components/billing/PublicPlanCard.tsx");
   assert.match(card, /offer\.benefits\.map/);
   assert.match(card, /money\(offer\.netPrice\)/);
