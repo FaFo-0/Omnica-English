@@ -12,7 +12,7 @@ Omnica English | Английский для взрослых
 Английский онлайн 1 на 1 с преподавателем
 Слова с урока — сразу в ваших карточках
 Бесплатная библиотека для чтения
-Пробный урок — 1 500 ₸ 👇
+Запишитесь на пробный урок 👇
 ```
 
 **Category:** Education
@@ -27,7 +27,7 @@ Omnica English | Английский для взрослых
 
 | Date | Post | Status |
 |---|---|---|
-| 2026-10 | Intro carousel «Урок закончился. Практика — продолжается.» (`archive/2026-10-intro-carousel/`) | Live. Rewrite the caption (too generic and AI-sounding). Pin it. |
+| 2026-10 | Intro carousel «Урок закончился. Практика — продолжается.» (`archive/2026-10-intro-carousel/`) | Live. Rewrite the caption (too generic and AI-sounding; also shows 1 500 ₸). Slide 7 has the price printed on it, so it needs replacing. Pin it. |
 | 2026-11 | Sally ad, as a Reel (`content/2026-11-sally-ad/`) | Recording tomorrow |
 
 Before ads drive traffic: the profile needs highlights and at least 3 posts.

@@ -51,5 +51,7 @@ Keep clear space around the logo of at least half the mark's height. Don't stret
 - Online lessons, one-to-one with a teacher, on Google Meet.
 - After a lesson: the lesson's words appear in the student's flashcards with translation and an example, and the teacher checks the homework.
 - The library and flashcards are free, with no lessons to buy. Registration is needed.
-- Trial lesson: **1 500 ₸**, a normal full lesson with the teacher.
-- Packs and prices: the live page at omnicaenglish.com/prices. Don't hard-code pack prices into designs that stay up long.
+- Trial lesson: a normal full lesson with the teacher.
+- Teachers: native speakers and Russian-speaking teachers, from different countries.
+- **Never put prices or ₸ in designs, bios or captions.** Students come from all over Central Asia and prices depend on their country. Say «пробный урок» and send people to omnicaenglish.com/prices.
+- Audience: Russian speakers across Central Asia. Never imply Kazakhstan only.

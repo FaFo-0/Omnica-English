@@ -1,10 +1,11 @@
 # Instagram highlights (remake)
 
-**Status:** step 2, copy waiting for FaFo's approval. No design yet.
+**Status:** step 3, copy approved by FaFo 2026-11-09 (prices removed, Teachers made general, About dropped). Next: screenshots and design.
 **Goal:** someone arrives from the ad, opens the profile, and understands what Omnica is, what it costs and how to start in under a minute.
-**Format:** Stories 1080 × 1920. One idea per Story, a big headline, one picture. 3–4 Stories per highlight (the old set had 35).
+**Format:** Stories 1080 × 1920. One idea per Story, a big headline, one picture. 3–4 Stories per highlight: 19 in total (the old set had 35).
 
-**Things FaFo needs to provide:** photos of the teachers (with their permission) and of Mustafa. Phone screenshots: Claude captures them fresh from the QA accounts.
+**Audience:** Russian speakers anywhere in Central Asia. **No prices or currency in the designs**: prices depend on the student's country and are on the site.
+**Phone screenshots:** Claude captures them fresh from the QA accounts. No photos needed for this set.
 
 ---
 
@@ -27,8 +28,8 @@
 
 **1.4** · yellow · **Link sticker → /prices**
 > **Попробуйте.**
-> *Пробный урок — 1 500 ₸*
-> EN: Try it. Trial lesson: 1,500 ₸
+> *Запишитесь на пробный урок.*
+> EN: Try it. Book a trial lesson.
 
 ## 2. Уроки · Lessons *(cover icon: two speech bubbles)*
 
@@ -48,8 +49,8 @@
 > EN: Your teacher checks the homework. You see where the mistake is and what's correct.
 
 **2.4** · yellow · Link sticker → /prices
-> **Первый урок — 1 500 ₸**
-> EN: First lesson: 1,500 ₸
+> **Начните с пробного урока.**
+> EN: Start with a trial lesson.
 
 ## 3. Библиотека · Library *(cover icon: open book)*
 
@@ -74,44 +75,44 @@
 ## 4. Цены · Prices *(cover icon: price tag)*
 
 **4.1** · yellow
-> **Пробный урок — 1 500 ₸**
+> **Начните с пробного урока.**
 > *Полноценный урок с преподавателем.*
-> EN: Trial lesson: 1,500 ₸. A full lesson with a teacher.
+> EN: Start with a trial lesson. A full lesson with a teacher.
 
-**4.2** · cream · pack sizes (prices only on the site)
+**4.2** · cream
 > **Дальше — пакеты уроков.**
-> 8, 12 или 24 урока. Чем больше — тем дешевле урок.
-> EN: Then lesson packs. 8, 12 or 24 lessons; the bigger the pack, the cheaper each lesson.
-> ⚠ Check that bigger packs really are cheaper per lesson in the live catalogue before publishing.
+> Выбирайте, сколько занятий вам удобно.
+> EN: Then lesson packs. Choose how many lessons suit you.
 
 **4.3** · purple · Link sticker → /prices
-> **Все цены — на сайте.**
+> **Цены — на сайте, для вашей страны.**
 > Оплата — через WhatsApp, мы поможем.
-> EN: All prices are on the site. Payment goes through WhatsApp; we'll help.
+> EN: Prices are on the site, for your country. Payment goes through WhatsApp; we'll help.
 
-## 5. Преподаватели · Teachers *(cover icon: person)*
+## 5. Преподаватели · Teachers *(cover icon: two people)*
 
-One Story per teacher: a **real photo**, name, one line about them, one line about how they teach. FaFo provides the photos and two facts per teacher. Sally is first.
-> **Салли** · *[откуда / опыт]*
-> «[одна фраза от неё о том, как она ведёт уроки]»
+General: about the team, not individual teachers (posts about Sally and Mustafa come later).
 
-## 6. О нас · About *(cover icon: heart, or Mustafa's photo)*
+**5.1** · purple
+> **Наши преподаватели**
+> *из разных стран.*
+> EN: Our teachers, from different countries.
 
-**6.1** · Mustafa's photo
-> **Я Мустафа, основатель Omnica English.**
-> EN: I'm Mustafa, the founder of Omnica English.
+**5.2** · cream · two simple panels side by side
+> **Носители языка** — живой английский и разговорная практика.
+> **Русскоязычные преподаватели** — объяснят сложное по-русски.
+> EN: Native speakers: real-life English and conversation practice. Russian-speaking teachers: explain the hard parts in Russian.
 
-**6.2** · cream
-> **Мы сделали Omnica вместе с преподавателями,**
-> *чтобы урок не заканчивался, когда вы закрываете ноутбук.*
-> EN: We built Omnica together with teachers, so the lesson doesn't end when you close the laptop.
+**5.3** · cream
+> **Расскажите о своей цели —**
+> *мы подберём преподавателя.*
+> EN: Tell us your goal, and we'll match you with a teacher.
 
-**6.3** · purple
-> **Есть вопрос? Пишите в Direct.**
-> *Отвечаю сам.*
-> EN: Got a question? Message us in Direct. I answer myself.
+**5.4** · yellow · Link sticker → /prices
+> **Познакомьтесь на пробном уроке.**
+> EN: Meet them in a trial lesson.
 
 ---
 
-**Highlight order on the profile:** Старт · Уроки · Библиотека · Цены · Преподаватели · О нас
-**Covers:** purple circle, yellow line icon (all six in one style).
+**Highlight order on the profile:** Старт · Уроки · Преподаватели · Библиотека · Цены
+**Covers:** purple circle, yellow line icon (all five in one style).
