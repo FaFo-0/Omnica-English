@@ -22,7 +22,9 @@ Online English academy **Omnica English** (omnicaenglish.com) — website, stude
 5. When work lands: remove fixed items from MASTER_PLAN §5 (known issues, open items only) and add an entry at the top of `docs/CHANGELOG.md`. **Attribution mandatory** — tag entries `[Claude]` / `[DeepSeek V4 Pro]` / `[AI-Name]`.
 6. Keep MASTER_PLAN minimal and organized — update the relevant section in place, never scatter.
 7. **Which AI:** Claude is the default for code and marketing. DeepSeek is the fallback for small, clearly scoped tasks (copy, translations, tiny fixes). Both follow this file and the same preview → ship flow.
-8. **FaFo prefers taps over typing.** Give him links and one-tap flows; never ask him to retype or copy long emails, passwords or codes.
+8. **Challenge FaFo's ideas.** FaFo says he is not an expert in marketing, design or anything else here, and his ideas aren't automatically better than yours. When he proposes a design, copy or product direction, question it and offer a better option when you see one, with a short reason. Then build what he decides.
+9. **Phone first for public pages.** Most visitors are on phones. Design and check mobile first; desktop only needs to look fine (this overrides "mobile pass dead last" for public pages).
+10. **FaFo prefers taps over typing.** Give him links and one-tap flows; never ask him to retype or copy long emails, passwords or codes.
 
 ## Tech stack (locked — discuss before changing)
 
