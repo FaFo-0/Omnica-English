@@ -206,6 +206,8 @@ export function PackEditor() {
   const rejectOrder = useMutation(api.pricing.rejectOrder);
   const deleteOrphanedOrder = useMutation(api.pricing.deleteOrphanedOrder);
   const grantLessons = useMutation(api.pricing.grantLessonsToStudent);
+  // Pick the student by name/email; the internal account ID never reaches the admin.
+  const studentOptions = useQuery(api.pricing.getAdminOrderOptions, { currency: "USD" });
 
   const families = (catalogue?.families ?? []) as unknown as FamilyRow[];
   const packs = (catalogue?.packs ?? []) as unknown as PackRow[];
@@ -411,7 +413,10 @@ export function PackEditor() {
         <h2 className="h2" style={{ margin: 0 }}>{t("grantLessons")}</h2>
         <p className="body-sm" style={{ marginTop: 4 }}>{t("giveLessonsHint")}</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8, marginTop: 12 }}>
-          <Input placeholder={t("studentId")} value={give.studentId} onChange={(event) => setGive({ ...give, studentId: event.target.value })} />
+          <select className="input" aria-label={t("studentId")} value={give.studentId} onChange={(event) => setGive({ ...give, studentId: event.target.value })} disabled={!studentOptions}>
+            <option value="">{studentOptions ? "Choose a student" : "Loading students…"}</option>
+            {studentOptions?.students.map((student) => <option key={student.studentId} value={student.studentId}>{student.name}{student.email ? ` · ${student.email}` : ""}</option>)}
+          </select>
           <Input type="number" min="1" placeholder={t("lessonsCount")} value={give.lessons} onChange={(event) => setGive({ ...give, lessons: event.target.value })} />
           <Input type="number" min="1" placeholder={t("validForDays", { days: "60" })} value={give.expiryDays} onChange={(event) => setGive({ ...give, expiryDays: event.target.value })} />
           <Input type="number" min="0" placeholder={t("amount")} value={give.amount} onChange={(event) => setGive({ ...give, amount: event.target.value })} />
