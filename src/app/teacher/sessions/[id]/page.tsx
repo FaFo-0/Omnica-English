@@ -25,7 +25,10 @@ import {
   Plus,
   X,
   StickyNote,
+  MessageCircle,
+  Copy,
 } from "lucide-react";
+import { homeworkWhatsAppUrl } from "@/lib/homeworkShare";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -719,6 +722,7 @@ function TeacherHomeworkTab({
   const [reviewComment, setReviewComment] = useState("");
   const [reviewing, setReviewing] = useState(false);
   const current = list[0];
+  const shareTarget = useQuery(api.homework.shareTarget, current && current.status !== "draft" ? { homeworkId: current._id } : "skip");
   const createdRef = useRef(false);
 
   // The teacher grades on a local copy so per-item marks aren't autosaved
@@ -966,6 +970,31 @@ function TeacherHomeworkTab({
           </div>
         )}
       </div>
+      {(status === "assigned" || status === "in_progress") && (() => {
+        const link = `${window.location.origin}/student/homework/${current._id}`;
+        return (
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              className="btn btn-tenant btn-sm"
+              href={homeworkWhatsAppUrl(link, shareTarget?.locale, shareTarget?.phone)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <MessageCircle size={13} className="me-1" />Send on WhatsApp
+            </a>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => void navigator.clipboard.writeText(link).then(() => toast.success("Homework link copied"))}
+            >
+              <Copy size={13} className="me-1" />Copy link
+            </button>
+            <span className="text-xs" style={{ color: "var(--omnic-gray-500)" }}>
+              Opens their homework after they sign in.
+            </span>
+          </div>
+        );
+      })()}
       <HomeworkEditor documentId={current._id} contentJson={current.contentJson} mode="readonly" onChange={() => {}} />
       {status === "reviewed" && current.teacherComment && (
         <div className="rounded-lg p-3 bg-green-50 dark:bg-green-950 text-green-900 dark:text-green-200 text-sm">

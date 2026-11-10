@@ -369,6 +369,31 @@ export const listForLesson = query({
   },
 });
 
+/** Who to message when the teacher shares an assigned homework on WhatsApp. */
+export const shareTarget = query({
+  args: { homeworkId: v.id("homework") },
+  handler: async (ctx, { homeworkId }) => {
+    const { orgId, user } = await requireTenant(ctx);
+    const row = await ctx.db.get(homeworkId);
+    if (!row || row.organizationId !== orgId) return null;
+    if (user.role !== "admin" && !(user.role === "teacher" && row.teacherId === user.externalId)) return null;
+    const student = await ctx.db.query("users")
+      .withIndex("by_organization_and_externalId", (q) => q.eq("organizationId", orgId).eq("externalId", row.studentId))
+      .unique();
+    if (!student) return null;
+    const profile = await ctx.db.query("studentProfiles")
+      .withIndex("by_organization_and_studentId", (q) => q.eq("organizationId", orgId).eq("studentId", row.studentId))
+      .unique();
+    const onboarding = await ctx.db.query("studentOnboarding")
+      .withIndex("by_organization_and_studentId", (q) => q.eq("organizationId", orgId).eq("studentId", row.studentId))
+      .unique();
+    const phone = profile
+      ? `${profile.phoneCountryCode} ${profile.phoneNumber}`.trim()
+      : (onboarding?.phoneWhatsapp ?? student.phoneWhatsapp ?? null);
+    return { locale: student.locale ?? null, phone };
+  },
+});
+
 export const listForStudent = query({
   args: { studentId: v.optional(v.string()) },
   handler: async (ctx, { studentId }) => {
