@@ -389,7 +389,7 @@ export const shareTarget = query({
       .unique();
     const phone = profile
       ? `${profile.phoneCountryCode} ${profile.phoneNumber}`.trim()
-      : (onboarding?.phoneWhatsapp ?? student.phoneWhatsapp ?? null);
+      : (student.phoneWhatsapp ?? onboarding?.phoneWhatsapp ?? null);
     return { locale: student.locale ?? null, phone };
   },
 });

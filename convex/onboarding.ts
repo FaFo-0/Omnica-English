@@ -163,6 +163,7 @@ export const completeStudentOnboarding = mutation({
     await ctx.db.patch(user._id, {
       onboardingComplete: true,
       name: args.name.trim(),
+      nameSetInApp: true,
       ...(args.phoneWhatsapp ? { phoneWhatsapp: args.phoneWhatsapp } : {}),
       ...(args.guardianName ? { guardianName: args.guardianName } : {}),
       ...(args.guardianPhone ? { guardianPhone: args.guardianPhone } : {}),

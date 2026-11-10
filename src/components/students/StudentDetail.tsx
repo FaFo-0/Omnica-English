@@ -2,8 +2,10 @@
 import { StudentLessonCleanup } from "./StudentLessonCleanup";
 import { userHasPermission } from "../../../convex/lib/permissions";
 import { StudentVocabulary } from "./StudentVocabulary";
+import { StudentProfileEditor } from "./StudentProfileEditor";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useMutation } from "convex/react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
 import { TelegramConnectionDetails } from "@/components/shared/TelegramConnectionStatus";
@@ -162,6 +164,8 @@ export function StudentDetail({
   // Clock preference follows the viewer everywhere, not just the calendar.
   const me = useQuery(api.users.getMe);
   const timeFmt: "12h" | "24h" = me?.timeFormat ?? "24h";
+  const [editing, setEditing] = useState(false);
+  const canEdit = !!me && userHasPermission(me, "users.edit");
 
   return (
     <div style={{ maxWidth: 900 }}>
@@ -238,7 +242,37 @@ export function StudentDetail({
 
           {/* Profile / contact */}
           <div className="card" style={{ padding: 20, marginBottom: 20 }}>
-            <div className="h3" style={{ marginBottom: 16 }}>Profile</div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 16 }}>
+              <div className="h3" style={{ margin: 0 }}>Profile</div>
+              {canEdit && (
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditing(true)}>
+                  <Icon name="edit" size={14} /> Edit
+                </button>
+              )}
+            </div>
+            {editing && (
+              <StudentProfileEditor
+                studentId={id}
+                email={data.student.email}
+                onClose={() => setEditing(false)}
+                initial={{
+                  name: data.student.name,
+                  phone: data.student.phone ?? "",
+                  guardianName: data.student.guardianName ?? "",
+                  guardianPhone: data.student.guardianPhone ?? "",
+                  timezone: data.student.timezone ?? "",
+                  age: data.profile.age != null ? String(data.profile.age) : "",
+                  englishLevel: data.student.englishLevelRaw ?? "",
+                  country: data.profile.country ?? "",
+                  goal: data.profile.goal ?? "",
+                  inTheirWords: data.profile.preferredTimes ?? "",
+                  preferredDays: data.profile.preferredDays,
+                  preferredTimeOfDay: data.profile.preferredTimeOfDay,
+                  interests: data.profile.interests,
+                  referralSource: data.profile.referralSource ?? "",
+                }}
+              />
+            )}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16 }}>
               <Field label="Phone / WhatsApp" value={data.student.phone} />
               {data.student.guardianName && (

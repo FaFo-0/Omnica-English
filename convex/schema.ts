@@ -275,6 +275,9 @@ export default defineSchema({
     tokenIdentifier: v.optional(v.string()),
 
     name: v.string(),
+    // Set once a name is typed in the app (student profile, onboarding, admin
+    // edit). From then on sign-in stops copying the Clerk account name over it.
+    nameSetInApp: v.optional(v.boolean()),
     email: v.string(),
     role: userRole,
     // Preserve the former role and history while removing a person's access.
