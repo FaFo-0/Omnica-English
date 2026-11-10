@@ -11,6 +11,7 @@ import {
   anchorTranscriptVocabularyCandidate,
   findTranscriptVocabularyUtterance,
   noteVocabularyCandidateId,
+  utteranceContainsSurface,
   assertTranscriptAnchorIsRetained,
   resolveCandidateExternalId,
 } from "./lib/transcriptVocabularyCandidates";
@@ -68,6 +69,7 @@ export const replaceVocab = mutation({
         // teacher-added candidate stable across an ordinary edit.
         externalId: v.optional(v.string()),
         utteranceId: v.optional(v.string()),
+        heardAs: v.optional(v.string()),
         included: v.optional(v.boolean()),
         exampleSentence: v.optional(v.string()),
         ipa: v.optional(v.string()),
@@ -100,18 +102,28 @@ export const replaceVocab = mutation({
       let anchored: ReturnType<typeof anchorTranscriptVocabularyCandidate> | undefined;
       let sourceTranscriptVersion: number | undefined;
       let noteCandidateId: string | undefined;
+      // English words said inside Arabic/Russian speech are often transcribed
+      // in that script; the model supplies the exact form it saw as `heardAs`.
+      const priorRow = item.externalId ? existingByExternalId.get(item.externalId) : undefined;
+      const heardAs = item.heardAs?.trim() || priorRow?.heardAs;
+      const surfaceIn = (text: string) =>
+        utteranceContainsSurface(text, item.word) ? item.word
+          : heardAs && utteranceContainsSurface(text, heardAs) ? heardAs : item.word;
       let utterance = item.utteranceId
         ? await ctx.db.query("lessonTranscriptUtterances")
             .withIndex("by_lessonId_and_utteranceId", q =>
               q.eq("lessonId", lessonId).eq("utteranceId", item.utteranceId!)).unique()
-        : findTranscriptVocabularyUtterance(item.word, automaticUtterances);
+        : findTranscriptVocabularyUtterance(item.word, automaticUtterances)
+          ?? (heardAs ? findTranscriptVocabularyUtterance(heardAs, automaticUtterances) : undefined);
       if (generated) {
         // Provider IDs are suggestions, never proof. Resolve against persisted
         // text when an ID is missing, invented, or points at the wrong sentence.
         utterance = findTranscriptVocabularyUtterance(
           item.word,
           utterance ? [utterance] : []
-        ) ?? findTranscriptVocabularyUtterance(item.word, automaticUtterances);
+        ) ?? findTranscriptVocabularyUtterance(item.word, automaticUtterances)
+          ?? (heardAs ? findTranscriptVocabularyUtterance(heardAs, utterance ? [utterance] : [])
+            ?? findTranscriptVocabularyUtterance(heardAs, automaticUtterances) : undefined);
         if (!utterance) {
           // Not spoken, but kept when the teacher wrote it in the notes.
           noteCandidateId = noteVocabularyCandidateId(lesson.externalId, item.word, lesson.teacherNotes);
@@ -125,10 +137,11 @@ export const replaceVocab = mutation({
         sourceTranscriptVersion = utterance.transcriptVersion;
         anchored = anchorTranscriptVocabularyCandidate({
           lessonExternalId: lesson.externalId,
-          surface: item.word,
+          surface: surfaceIn(utterance.text),
           utterance,
         });
       }
+      const viaHeardAs = !!anchored && !utteranceContainsSurface(anchored.sentence, item.word);
 
       const externalId = (item.externalId && knownExistingIds.has(item.externalId)
         ? item.externalId : anchored?.candidateId ?? noteCandidateId) ?? resolveCandidateExternalId({
@@ -153,7 +166,9 @@ export const replaceVocab = mutation({
         senseLabel: item.senseLabel?.trim() || existingRow?.senseLabel || item.definition || item.word,
         translationLocale: item.translationLocale,
         partOfSpeech: item.partOfSpeech,
-        exampleSentence: anchored?.sentence ?? existingRow?.exampleSentence ?? item.exampleSentence,
+        // A sentence in another script is no English example; keep only the anchor.
+        exampleSentence: viaHeardAs ? undefined : anchored?.sentence ?? existingRow?.exampleSentence ?? item.exampleSentence,
+        heardAs: viaHeardAs ? heardAs : undefined,
         candidateId: anchored?.candidateId ?? existingRow?.candidateId,
         utteranceId: anchored?.utteranceId ?? existingRow?.utteranceId,
         sourceSpeaker: anchored?.speaker ?? existingRow?.sourceSpeaker,

@@ -438,6 +438,9 @@ export default defineSchema({
     sourceStartMs: v.optional(v.number()),
     sourceEndMs: v.optional(v.number()),
     sourceTranscriptVersion: v.optional(v.number()),
+    // The exact transcribed form when the English word was written in another
+    // script (Soniox writes "Brazilian" as برازيليان inside Arabic speech).
+    heardAs: v.optional(v.string()),
     // Assigned once when a candidate is created; definition edits must not
     // silently turn one learner word into a second sense/card.
     senseId: v.optional(v.string()),

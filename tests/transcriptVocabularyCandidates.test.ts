@@ -4,6 +4,7 @@ import {
   assertTranscriptAnchorIsRetained,
   anchorTranscriptVocabularyCandidate,
   noteVocabularyCandidateId,
+  utteranceContainsSurface,
   resolveCandidateExternalId,
   type PersistedTranscriptUtterance,
 } from "../convex/lib/transcriptVocabularyCandidates.ts";
@@ -102,4 +103,15 @@ test("keeps a note-only word only when the teacher actually wrote it", () => {
   assert.equal(noteVocabularyCandidateId("lesson-42", "take over", notes), undefined);
   assert.equal(noteVocabularyCandidateId("lesson-42", "row", notes), undefined);
   assert.equal(noteVocabularyCandidateId("lesson-42", "take off", undefined), undefined);
+});
+
+// Regression (2026-11-10): Soniox writes English said inside Arabic speech in
+// Arabic letters; ASCII `\b` never matched those, so every word was dropped.
+test("matches complete words in non-Latin scripts, not fragments", () => {
+  const text = "يعني إذا سمعت أحد قال لك: آي أم فروم برازيل. برازيليان يعني شخص من البرازيل";
+  assert.equal(utteranceContainsSurface(text, "برازيليان"), true);
+  assert.equal(utteranceContainsSurface(text, "آي أم فروم"), true);
+  assert.equal(utteranceContainsSurface(text, "برازي"), false);
+  assert.equal(utteranceContainsSurface("He looked after it", "look after"), false);
+  assert.equal(utteranceContainsSurface("She isn't here", "isn't"), true);
 });

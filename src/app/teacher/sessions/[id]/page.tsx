@@ -225,6 +225,7 @@ export default function SessionReviewPage() {
           translationLocale: (learnerLocale ?? "ru") as "en" | "ru" | "ar" | "kk",
           partOfSpeech: typeof it.partOfSpeech === "string" ? it.partOfSpeech : undefined,
           utteranceId: typeof it.utteranceId === "string" ? it.utteranceId.trim() : "",
+          heardAs: typeof it.heardAs === "string" && it.heardAs.trim() ? it.heardAs.trim() : undefined,
           included: true,
         }));
         await replaceVocab({ lessonId, items, generated: true });
