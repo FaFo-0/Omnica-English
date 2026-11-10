@@ -30,7 +30,7 @@ export const defaultPromptConfigs = [
     model: "deepseek/deepseek-v4.1-flash",
     provider: "openrouter" as const,
     temperature: 0.2,
-    maxTokens: 3000,
+    maxTokens: 6000,
     outputFormat: "json" as const,
   },
   {
