@@ -137,7 +137,7 @@ function OrderCard({ order, busy, onGrant, onReject, onDelete }: { order: OrderR
       <div style={{ display: "flex", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
         <div style={{ minWidth: 0, flex: "1 1 240px", overflowWrap: "anywhere" }}>
           <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
-            <strong>{order.buyerName}</strong><span className="body-sm">{order.buyerStudentId}</span>
+            <strong>{order.buyerName}</strong>
           </div>
           <div className="body-sm" style={{ marginTop: 6 }}>{order.planSnapshot.familyLabel} · {order.planSnapshot.planLabel}</div>
           <div className="body-sm" style={{ marginTop: 4 }}>{t("lessonEntitlement")}: {order.planSnapshot.lessonCount} · {t("expiryDays")}: {order.planSnapshot.expiryDays}</div>
@@ -333,7 +333,7 @@ export function PackEditor() {
                     isVisible: family.isVisible,
                     showOnWebsite: family.showOnWebsite !== false,
                   })}>{t("edit")}</Button>
-                  <details className="relative"><summary className="btn cursor-pointer">More</summary><div className="absolute z-20 end-0 mt-1 min-w-44 rounded-xl border bg-white p-2 shadow-lg grid gap-1"><Button size="sm" variant="outline" disabled={busy} onClick={() => void run(() => duplicateFamily({ familyId: family._id as never }), "Family duplicated (hidden)")}>Duplicate family</Button><Button size="sm" variant="destructive" disabled={busy} onClick={() => { if (confirm(`Delete ${family.label} and its ${familyPacks.length} packs? Existing orders and payments are kept.`)) void run(() => deleteFamily({familyId: family._id as never}), "Family deleted"); }}>Delete family</Button></div></details>
+                  <details className="relative"><summary className="inline-flex h-7 cursor-pointer list-none items-center rounded-[min(var(--radius-md),12px)] border border-border bg-background px-2.5 text-[0.8rem] font-medium hover:bg-muted [&::-webkit-details-marker]:hidden">More</summary><div className="absolute z-20 end-0 mt-1 min-w-44 rounded-xl border bg-popover p-2 shadow-lg grid gap-1"><Button size="sm" variant="outline" disabled={busy} onClick={() => void run(() => duplicateFamily({ familyId: family._id as never }), "Family duplicated (hidden)")}>Duplicate family</Button><Button size="sm" variant="destructive" disabled={busy} onClick={() => { if (confirm(`Delete ${family.label} and its ${familyPacks.length} packs? Existing orders and payments are kept.`)) void run(() => deleteFamily({familyId: family._id as never}), "Family deleted"); }}>Delete family</Button></div></details>
                   <Button size="sm" variant="outline" disabled={busy} onClick={() => void run(() => setFamilyVisible({ familyId: family._id as never, isVisible: !family.isVisible }), t("saved"))}>
                     {family.isVisible ? t("hide") : t("show")}
                   </Button>
@@ -523,7 +523,7 @@ function PackRowView({ pack, busy, onEdit, onMove, onToggleVisible, onToggleArch
         <Button size="sm" variant="outline" aria-label={t("moveDown")} disabled={busy} onClick={() => onMove(1)}>↓</Button>
         <Button size="sm" variant="outline" onClick={onEdit}>{t("edit")}</Button>
         <Button size="sm" variant="outline" disabled={busy} onClick={onToggleVisible}>{pack.isVisible ? t("hide") : t("show")}</Button>
-        <Button size="sm" variant="outline" disabled={busy} onClick={onToggleArchived}>{pack.isArchived ? t("restore") : t("archive")}</Button><details className="relative"><summary className="btn cursor-pointer">More</summary><div className="absolute z-20 end-0 mt-1 min-w-36 rounded-xl border bg-white p-2 shadow-lg grid gap-1"><Button size="sm" variant="outline" disabled={busy} onClick={onDuplicate}>Duplicate</Button><Button size="sm" variant="destructive" disabled={busy} onClick={onDelete}>Delete</Button></div></details>
+        <Button size="sm" variant="outline" disabled={busy} onClick={onToggleArchived}>{pack.isArchived ? t("restore") : t("archive")}</Button><details className="relative"><summary className="inline-flex h-7 cursor-pointer list-none items-center rounded-[min(var(--radius-md),12px)] border border-border bg-background px-2.5 text-[0.8rem] font-medium hover:bg-muted [&::-webkit-details-marker]:hidden">More</summary><div className="absolute z-20 end-0 mt-1 min-w-36 rounded-xl border bg-popover p-2 shadow-lg grid gap-1"><Button size="sm" variant="outline" disabled={busy} onClick={onDuplicate}>Duplicate</Button><Button size="sm" variant="destructive" disabled={busy} onClick={onDelete}>Delete</Button></div></details>
       </div>
     </div>
   );
