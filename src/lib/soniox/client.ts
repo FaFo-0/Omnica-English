@@ -62,6 +62,8 @@ export class SonioxRecorder {
   > | null = null;
   private _isRecording = false;
   private finishPending: (() => void) | null = null;
+  /** Set while we close the connection ourselves, so it isn't reported as a drop. */
+  private closing = false;
   private _onTokens: OnTokensCallback | null = null;
 
   // Audio resources
@@ -165,6 +167,20 @@ export class SonioxRecorder {
         languageHints: this.config.languageHints,
         enableSpeakerDiarization: true,
         stream: streamForSoniox,
+      });
+
+      // The SDK has no close handler: when Soniox drops the connection it keeps
+      // "running", the page says Recording and nothing is transcribed (the
+      // "stuck after pause" report, 2026-11-11). Watch the socket ourselves.
+      this.closing = false;
+      const socket = (this.client as unknown as { _websocket?: WebSocket | null })._websocket;
+      socket?.addEventListener("close", (event) => {
+        if (this.closing || !this._isRecording) return;
+        onError(`The transcription connection dropped (code ${event.code}). Tap Continue recording — the transcript so far is saved.`);
+        onStatus("error");
+        this.finishPending?.();
+        try { this.client?.cancel(); } catch { /* already closed */ }
+        this.cleanup();
       });
     } catch (err) {
       onError(err instanceof Error ? err.message : String(err));
@@ -276,6 +292,7 @@ export class SonioxRecorder {
   }
 
   async stop(): Promise<void> {
+    this.closing = true;
     const client = this.client;
     if (client && this._isRecording) {
       await new Promise<void>((resolve) => {
@@ -290,6 +307,7 @@ export class SonioxRecorder {
   }
 
   cancel(): void {
+    this.closing = true;
     if (this.client) {
       try {
         this.client.cancel();

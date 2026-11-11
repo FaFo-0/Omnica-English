@@ -147,7 +147,7 @@ scripts/dev-login.mjs   messages/   POLICY.md
 - **Library:** no PDF/audio upload.
 - **Settings toggles with no effect yet:** Gamification, Live Quiz Generation, Payments save but nothing reads them.
 - **Legacy vocabulary rows missing definitions:** cleanup is implemented but deliberately not run (needs `DELETE_MISSING_DEFINITIONS`; pre-2026-07-29 rows only).
-- **Planned, not built:** groups, certificates. Any payment-provider integration needs a new approved design.
+- **Planned, not built:** groups, certificates; **mistake highlighter** — before the summary, AI marks transcript sentences with grammar/structure mistakes in red with a short explanation and the correction; students review their own, teachers can confirm or correct (FaFo 2026-11-11). Any payment-provider integration needs a new approved design.
 - **Tech debt:** transcript passed via a global `window` bridge on live/review pages; legacy `any` types. Repo-wide lint baseline ~263 findings (2026-09-08) — don't mass-fix; fix what you touch.
 
 QA: reusable dev actors (§4) and [docs/MANUAL_QA_RUNBOOK.md](docs/MANUAL_QA_RUNBOOK.md). Billing model reference: [docs/BILLING.md](docs/BILLING.md).

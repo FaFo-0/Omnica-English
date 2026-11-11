@@ -42,11 +42,11 @@ function fnv1a(s: string): string {
 }
 
 /** Group final tokens by speaker into stable, time-anchored utterances. */
-export function buildUtterances(tokens: TranscriptToken[]): Utterance[] {
+export function buildUtterances(tokens: TranscriptToken[], teacherSpeaker?: string | null): Utterance[] {
   const final = tokens.filter((t) => t.isFinal);
   if (final.length === 0) return [];
 
-  const labels = buildSpeakerLabels(tokens);
+  const labels = buildSpeakerLabels(tokens, teacherSpeaker);
 
   const segments: { speaker: string; text: string; startMs?: number; endMs?: number }[] = [];
   let currentSpeaker: string | undefined;
