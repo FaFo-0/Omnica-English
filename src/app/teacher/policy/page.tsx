@@ -1,8 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { PortalPolicyPage } from "@/components/policy/PortalPolicyPage";
-
-// Teachers see their own rules and the student rules they enforce.
-export default function TeacherPolicyPage() {
-  return <PortalPolicyPage audience="all" />;
+// The rules live in the teacher guide now; old links land on that section.
+export default function TeacherPolicyRedirect() {
+  redirect("/teacher/guide#rules");
 }

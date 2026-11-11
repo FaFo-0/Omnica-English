@@ -61,7 +61,7 @@ export function StaffCalendar({
   const availabilityText = useTranslations("components.calendar.availabilityActions");
   const me = useQuery(api.users.getMe);
   const livePolicy = useQuery(api.policyConstants.get, {});
-  const rulesHref = me?.role === "teacher" ? "/teacher/policy" : "/admin/settings#policy";
+  const rulesHref = me?.role === "teacher" ? "/teacher/guide#rules" : "/admin/settings#policy";
   const [viewerTz, setViewerTz] = useViewerTz(me?.timezone);
   const [clock, setClock] = useTimeFormat(me?.timeFormat);
   const [selectedDate, setDate] = useState<Date | null>(() => initialDate ?? null);

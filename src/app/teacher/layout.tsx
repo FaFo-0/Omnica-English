@@ -26,7 +26,7 @@ export default function TeacherLayout({
           <TeacherBrowserGate role={user?.role}>{children}</TeacherBrowserGate>
         ) : (
           <PortalShell sections={TEACHER_SIDEBAR}>
-            <PolicyUpdatedBanner rulesHref="/teacher/policy" />
+            <PolicyUpdatedBanner rulesHref="/teacher/guide#rules" />
             <TeacherBrowserGate role={user?.role}>{children}</TeacherBrowserGate>
           </PortalShell>
         )}

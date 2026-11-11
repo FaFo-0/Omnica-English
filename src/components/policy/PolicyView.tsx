@@ -9,6 +9,7 @@ import {
   UserCheck, UserX, Wallet, MessageCircle,
 } from "lucide-react";
 import type { ComponentType } from "react";
+import { InfoCard } from "./InfoCard";
 import {
   POLICY_CHROME,
   studentPolicyCards,
@@ -28,29 +29,7 @@ const ICONS: Record<PolicyCardIcon, ComponentType<{ size?: number; strokeWidth?:
 };
 
 function Card({ card }: { card: PolicyCard }) {
-  const Icon = ICONS[card.icon];
-  const tint =
-    card.tone === "good" ? "bg-emerald-50 text-emerald-700"
-    : card.tone === "warn" ? "bg-amber-50 text-amber-700"
-    : "bg-[color-mix(in_srgb,var(--policy-accent)_12%,white)] text-[var(--policy-accent)]";
-  return (
-    <article className="rounded-2xl border border-[#26143f]/10 bg-white p-4 shadow-sm sm:p-5">
-      <div className="flex items-center gap-3">
-        <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tint}`}>
-          <Icon size={20} strokeWidth={2.2} />
-        </span>
-        <h3 className="text-lg font-extrabold text-[#26143f]">{card.title}</h3>
-      </div>
-      <ul className="mt-3 space-y-1.5 ps-1 text-[15px] leading-relaxed text-[#4a4155]">
-        {card.lines.map((line) => (
-          <li key={line} className="flex gap-2">
-            <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#26143f]/30" />
-            <span>{line}</span>
-          </li>
-        ))}
-      </ul>
-    </article>
-  );
+  return <InfoCard icon={ICONS[card.icon]} title={card.title} lines={card.lines} tone={card.tone ?? "accent"} />;
 }
 
 /** "Book ≥ N h · free ≥ M h · used < M h · start" — one glance at the clock. */
