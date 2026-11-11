@@ -31,7 +31,6 @@ import {
 const MAX_PLAN = 60;
 const booking = v.object({ date: v.string(), startTime: v.string() });
 
-const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
 const toTime = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 
 type PlanItem = { date: string; startTime: string; endTime: string; ok: boolean; reason?: string; paid: boolean };
