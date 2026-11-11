@@ -474,6 +474,47 @@
 
   @media (max-width: 1100px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } .grid-3 { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 700px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } .split-2-1 { grid-template-columns: 1fr; } }
+  /* Grid items default to min-width:auto, so one wide child (a date input, a
+     long number) pushes the whole card past the phone edge. Let them shrink. */
+  .grid-2 > *, .grid-3 > *, .grid-4 > *, .split-2-1 > * { min-width: 0; }
+  .input, .select, .textarea { min-width: 0; }
+
+  /* Stat tiles and small figure pairs stay two-up on phones instead of one long column. */
+  @media (max-width: 700px) {
+    .grid-4.metrics-2up, .grid-2.pairs-2up { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .metrics-2up .card { padding: 14px !important; }
+    .metrics-2up .card > div:nth-child(2) { font-size: 24px !important; margin-top: 8px !important; }
+    .metrics-2up .body-sm { line-height: 1.25; }
+    /* Income + costs side by side, net across the full width. */
+    .grid-3.totals-2up { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .totals-2up > :last-child { grid-column: 1 / -1; }
+    .totals-2up .card > div:not(.body-sm) { overflow-wrap: anywhere; }
+  }
+
+  /* Wide tables become one card per row on phones: header hidden, each cell
+     shows its column name (data-label) above the value. Cells marked
+     data-wide take the full row; data-actions sit at the end of the card. */
+  @media (max-width: 640px) {
+    .tbl-wrap:has(.tbl-stack) { background: transparent; border: 0; box-shadow: none; overflow: visible; }
+    .tbl-stack thead { display: none; }
+    .tbl-stack, .tbl-stack tbody { display: block; }
+    .tbl-stack tr {
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px;
+      padding: 14px; margin-bottom: 10px; border-radius: var(--r-xl);
+      background: var(--card-bg); border: 1px solid var(--omnic-gray-100); box-shadow: var(--shadow-card);
+    }
+    .tbl-stack tr:hover td { background: transparent; }
+    .tbl-stack td { display: block; padding: 0; border: 0; font-size: 14px; }
+    .tbl-stack td[data-label]::before {
+      content: attr(data-label); display: block; margin-bottom: 2px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--omnic-gray-500);
+    }
+    .tbl-stack-3 tr { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .tbl-stack td[data-wide], .tbl-stack td[colspan] { grid-column: 1 / -1; }
+    .tbl-stack td[data-actions] { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; }
+    .tbl-stack td[data-actions]:empty { display: none; }
+    .tbl-stack td[data-actions] .btn { min-height: 40px; }
+  }
 
   .muted { color: var(--omnic-gray-500); }
   .subtle { color: var(--omnic-gray-400); }
