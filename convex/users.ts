@@ -1130,6 +1130,22 @@ export const assignTeacher = mutation({
         link: "/teacher/students",
         createdAt: now,
       });
+      const nextTeacher = await ctx.db
+        .query("users")
+        .withIndex("by_organization_and_externalId", (q) =>
+          q.eq("organizationId", orgId).eq("externalId", nextTeacherId),
+        )
+        .first();
+      if (nextTeacher?.name) {
+        await ctx.db.insert("notifications", {
+          organizationId: orgId,
+          recipientId: studentId,
+          kind: "teacher_assigned",
+          payload: { teacherId: nextTeacherId, teacherName: nextTeacher.name },
+          link: "/student/calendar",
+          createdAt: now,
+        });
+      }
     }
 
     await syncAutomaticHomeworkDeadlines(ctx,orgId,studentId);

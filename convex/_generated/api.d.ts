@@ -88,6 +88,7 @@ import type * as libraryImport from "../libraryImport.js";
 import type * as libraryPreparation from "../libraryPreparation.js";
 import type * as libraryWorks from "../libraryWorks.js";
 import type * as maintenance from "../maintenance.js";
+import type * as notificationDigests from "../notificationDigests.js";
 import type * as notifications from "../notifications.js";
 import type * as onboarding from "../onboarding.js";
 import type * as payroll from "../payroll.js";
@@ -202,6 +203,7 @@ declare const fullApi: ApiFromModules<{
   libraryPreparation: typeof libraryPreparation;
   libraryWorks: typeof libraryWorks;
   maintenance: typeof maintenance;
+  notificationDigests: typeof notificationDigests;
   notifications: typeof notifications;
   onboarding: typeof onboarding;
   payroll: typeof payroll;

@@ -1,7 +1,7 @@
 import { syncLessonTitles } from "./syncLessonTitles";
 import type { MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
-import { insertNotification } from "../notifications";
+import { insertNotification, notifyBestEffort } from "../notifications";
 import { refundPointsForEventInternal } from "../points";
 import { loadPolicy } from "./policySettings";
 import {
@@ -227,6 +227,25 @@ export async function transitionNoShowForEvent(
         sourceKey: teacherGenuineNoShowSourceKey(event._id, admin.externalId),
       });
     }
+  }
+
+  if (args.party === "student" && event.studentId) {
+    // The booked credit stays spent (POLICY: student no-show is charged);
+    // tell the student so a missed lesson is never a silent deduction.
+    await notifyBestEffort(ctx, {
+      organizationId: args.organizationId,
+      recipientId: event.studentId,
+      kind: "student_no_show",
+      payload: {
+        eventId: event._id,
+        title: event.title,
+        date: event.date,
+        startTime: event.startTime,
+        charged: (event.pointCostSnapshot ?? 0) > 0 && !event.unpaid,
+      },
+      link: "/student/calendar",
+      sourceKey: `student-no-show:${event._id}`,
+    });
   }
 
   await ctx.db.patch(event._id, {

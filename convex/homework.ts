@@ -646,7 +646,9 @@ export async function assignApprovedForLesson(
   ctx: MutationCtx,
   orgId: string,
   lessonId: Id<"lessons">,
-  studentId: string
+  studentId: string,
+  /** Publish announces homework inside its "materials ready" notice. */
+  options: { notify?: boolean } = {}
 ): Promise<number> {
   const rows = await ctx.db
     .query("homework")
@@ -668,14 +670,16 @@ export async function assignApprovedForLesson(
       ...deadline,
       updatedAt: now,
     });
-    await ctx.db.insert("notifications", {
-      organizationId: orgId,
-      recipientId: studentId,
-      kind: "homework_assigned",
-      payload: { homeworkId: row._id, title: row.title, dueAt: due },
-      link: `/student/homework/${row._id}`,
-      createdAt: now,
-    });
+    if (options.notify !== false) {
+      await ctx.db.insert("notifications", {
+        organizationId: orgId,
+        recipientId: studentId,
+        kind: "homework_assigned",
+        payload: { homeworkId: row._id, title: row.title, dueAt: due },
+        link: `/student/homework/${row._id}`,
+        createdAt: now,
+      });
+    }
     sent++;
   }
   return sent;

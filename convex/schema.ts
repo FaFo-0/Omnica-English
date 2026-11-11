@@ -1,7 +1,7 @@
 import { preparedWord, preparationState } from "./lib/libraryValidators";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { NOTIFICATION_KINDS } from "./lib/notificationRegistry";
+import { STORED_NOTIFICATION_KINDS } from "./lib/notificationRegistry";
 
 // ── Reusable validators ────────────────────────────────────────────
 const contentSectionStatus = v.union(
@@ -998,6 +998,13 @@ export default defineSchema({
       v.union(v.literal("teacher"), v.literal("student"), v.literal("admin"))
     ),
     cancelledAt: v.optional(v.string()),
+    // `cancelledBy` is whose cancellation it counts as (policy, quota,
+    // reliability). When staff cancelled it for someone else — a teacher
+    // cancelling because the student asked on WhatsApp, or an admin acting for
+    // either side — this records who actually pressed the button.
+    cancelledOnBehalfBy: v.optional(
+      v.union(v.literal("teacher"), v.literal("admin"))
+    ),
     cancellationCharged: v.optional(v.boolean()), // true = lesson burned (late/over-quota)
     rescheduledBy: v.optional(
       v.union(v.literal("teacher"), v.literal("student"), v.literal("admin"))
@@ -1411,7 +1418,7 @@ export default defineSchema({
     organizationId: v.string(),
     recipientId: v.string(), // user externalId
     // Single source of truth: convex/lib/notificationRegistry.ts.
-    kind: v.union(...NOTIFICATION_KINDS.map((k) => v.literal(k))),
+    kind: v.union(...STORED_NOTIFICATION_KINDS.map((k) => v.literal(k))),
     payload: v.any(),
     link: v.optional(v.string()),
     // Stable source event + recipient key for notifications that must be
