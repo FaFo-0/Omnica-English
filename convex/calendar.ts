@@ -14,12 +14,14 @@ import {
   rescheduleVerdict,
   withinActionHorizon,
   ordinaryBookingBoundary,
+  cancelRoles,
   type Actor,
+  type CancelFor,
 } from "./lib/policy";
 import type { Id, Doc } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { grantPointsInternal, spendPointsInternal } from "./points";
-import { insertNotification } from "./notifications";
+import { notifyBestEffort } from "./notifications";
 import { DEFAULT_ACTIVITY_TYPES } from "./tenantSettings";
 import { instantToZoned, wallTimeToMs } from "./lib/time";
 import { canonicalizeBookings } from "./lib/calendarBookingPlan";
@@ -1104,7 +1106,32 @@ export const actionPreview = query({
       ),
       isFirstLessonWithStudent: await isFirstLesson(ctx, orgId, event),
     });
+    // Staff choose who a cancellation is for; preview the "student asked"
+    // outcome too so the dialog can say free vs charged before confirming.
+    const cancelForStudent =
+      actor === "student"
+        ? null
+        : cancelVerdict({
+            actor: "student",
+            event,
+            now,
+            orgTz,
+            studentRecentFreeCancels: await countRecentFreeCancels(
+              ctx,
+              orgId,
+              event.studentId,
+            ),
+            isFirstLessonWithStudent: false,
+          });
     const reschedule = rescheduleVerdict({ actor, event, now, orgTz });
+    if (isRunningOrFinished(event) && cancelForStudent) {
+      cancelForStudent.allowed = false;
+      cancelForStudent.reason = "A running or finished lesson cannot be cancelled";
+    }
+    if (actor !== "student" && cancelForStudent && !userHasPermission(user, "calendar.cancel.full")) {
+      cancelForStudent.allowed = false;
+      cancelForStudent.reason = "Cancellation is not permitted";
+    }
     if (isRunningOrFinished(event)) {
       cancel.allowed = false;
       cancel.reason = "A running or finished lesson cannot be cancelled";
@@ -1125,7 +1152,7 @@ export const actionPreview = query({
         reschedule.reasonKey = "move.permission";
       }
     }
-    return { actor, cancel, reschedule };
+    return { actor, cancel, cancelForStudent, reschedule };
   },
 });
 
@@ -1245,8 +1272,14 @@ export const blockTimeOff = mutation({
     fromDate: v.string(),
     toDate: v.string(),
     teacherId: v.optional(v.string()),
+    /**
+     * Cancel the lessons booked in the range as the teacher's own
+     * cancellation (students get their credit back and one notice listing
+     * every lesson), then block — all in one transaction.
+     */
+    cancelBookedLessons: v.optional(v.boolean()),
   },
-  handler: async (ctx, { fromDate, toDate, teacherId: requestedTeacherId }) => {
+  handler: async (ctx, { fromDate, toDate, teacherId: requestedTeacherId, cancelBookedLessons }) => {
     const { orgId, user } = await requireTenant(ctx);
     if (user.role !== "teacher" && user.role !== "admin") {
       throw new ConvexError("Only teachers block time off");
@@ -1289,7 +1322,26 @@ export const blockTimeOff = mutation({
     const booked = (
       await loadTeacherEvents(ctx, orgId, teacherId, fromDate, toDate)
     ).filter((e) => e.status === "scheduled" || e.status === "makeup");
-    if (booked.length > 0) {
+    let affectedLessons = 0;
+    if (booked.length > 0 && cancelBookedLessons) {
+      const orgTz = await orgTimezone(ctx, orgId);
+      const cancelled: CancelledLesson[] = [];
+      for (const event of booked)
+        cancelled.push(await cancelOneEvent(ctx, { orgId, user, event, cancelFor: "teacher", orgTz }));
+      const actor: Actor = user.role === "admin" ? "admin" : "teacher";
+      await notifyCancellations(ctx, {
+        orgId,
+        user,
+        actor,
+        cancelFor: "teacher",
+        cancelled,
+      });
+      for (const studentId of new Set(cancelled.map((row) => row.studentId).filter(Boolean) as string[])) {
+        await syncAutomaticHomeworkDeadlines(ctx, orgId, studentId);
+        await syncLessonTitles(ctx, orgId, studentId);
+      }
+      affectedLessons = cancelled.length;
+    } else if (booked.length > 0) {
       const first = booked
         .slice()
         .sort((a, b) =>
@@ -1344,11 +1396,51 @@ export const blockTimeOff = mutation({
       });
     }
 
-    return { blockedDays: days, affectedLessons: 0, needsApproval, groupId };
+    return { blockedDays: days, affectedLessons, needsApproval, groupId };
   },
 });
 
 /** Admin signs off on a long time-off run so it stops nagging. */
+/**
+ * Booked lessons inside a planned time-off range, with whether this user may
+ * cancel each one, so the time-off dialog can clear them in one step.
+ */
+export const bookedInRange = query({
+  args: { fromDate: v.string(), toDate: v.string(), teacherId: v.optional(v.string()) },
+  handler: async (ctx, { fromDate, toDate, teacherId: requested }) => {
+    const { orgId, user } = await requireTenant(ctx);
+    if (user.role !== "teacher" && user.role !== "admin") return [];
+    if (!isValidAcademyDate(fromDate) || !isValidAcademyDate(toDate) || toDate < fromDate) return [];
+    if (calendarDayDistance(fromDate, toDate) > 31) return [];
+    const teacherId = user.role === "admin" ? (requested ?? user.externalId) : user.externalId;
+    const orgTz = await orgTimezone(ctx, orgId);
+    const now = new Date();
+    const events = (await loadTeacherEvents(ctx, orgId, teacherId, fromDate, toDate))
+      .filter((e) => e.status === "scheduled" || e.status === "makeup")
+      .sort((a, b) => `${a.date}T${a.startTime}`.localeCompare(`${b.date}T${b.startTime}`));
+    const rows = [];
+    for (const event of events) {
+      const verdict = cancelVerdict({
+        actor: user.role === "admin" ? "admin" : "teacher",
+        event,
+        now,
+        orgTz,
+        studentRecentFreeCancels: 0,
+        isFirstLessonWithStudent: await isFirstLesson(ctx, orgId, event),
+      });
+      rows.push({
+        _id: event._id,
+        date: event.date,
+        startTime: event.startTime,
+        studentName: (await userName(ctx, orgId, event.studentId)) ?? event.title,
+        canCancel: verdict.allowed && !isRunningOrFinished(event),
+        reason: verdict.allowed ? undefined : verdict.reason,
+      });
+    }
+    return rows;
+  },
+});
+
 export const approveTimeOff = mutation({
   args: { groupId: v.string() },
   handler: async (ctx, { groupId }) => {
@@ -1360,10 +1452,22 @@ export const approveTimeOff = mutation({
       .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
       .collect();
     let approved = 0;
-    for (const r of rows) {
-      if (r.timeOffGroupId !== groupId || r.timeOffApprovedAt) continue;
+    const group = rows.filter((r) => r.timeOffGroupId === groupId);
+    for (const r of group) {
+      if (r.timeOffApprovedAt) continue;
       await ctx.db.patch(r._id, { timeOffApprovedAt: NOW() });
       approved++;
+    }
+    if (approved > 0) {
+      const dates = group.map((r) => r.date).sort();
+      await notifyBestEffort(ctx, {
+        organizationId: orgId,
+        recipientId: group[0].teacherId,
+        kind: "time_off_approved",
+        payload: { fromDate: dates[0], toDate: dates[dates.length - 1], days: dates.length },
+        link: "/teacher/calendar",
+        sourceKey: `time-off-approved:${groupId}`,
+      });
     }
     return { approved };
   },
@@ -1971,15 +2075,22 @@ export const confirmBookingBatch = mutation({
         reason: `Booked lesson on ${item.date} ${item.startTime}`,
         performedBy: user.externalId,
       });
-      await insertNotification(ctx, {
+      booked.push({ eventId, date: item.date, startTime: item.startTime });
+    }
+    // One notice for the whole batch — eight booked lessons are one event
+    // for the teacher, not eight pings.
+    if (booked.length > 0) {
+      const lessons = booked
+        .map(({ date, startTime }) => ({ date, startTime }))
+        .sort((a, b) => `${a.date}T${a.startTime}`.localeCompare(`${b.date}T${b.startTime}`));
+      await notifyBestEffort(ctx, {
         organizationId: orgId,
         recipientId: user.teacherId,
         kind: "lesson_assigned",
-        payload: { date: item.date, startTime: item.startTime, by: "student" },
+        payload: { ...lessons[0], lessons, by: "student", studentName: user.name },
         link: "/teacher/calendar",
-        sourceKey: `calendar-booking:${requestId}:${eventId}`,
+        sourceKey: `calendar-booking:${requestId}`,
       });
-      booked.push({ eventId, date: item.date, startTime: item.startTime });
     }
     const receiptId = await ctx.db.insert("calendarBookingRequests", {
       organizationId: orgId,
@@ -2134,6 +2245,33 @@ export const pauseStudent = mutation({
       createdBy: user.externalId,
       createdAt: NOW(),
     });
+
+    // The teacher and the academy hear about it; whoever paused doesn't.
+    const recipients = new Map<string, string>();
+    if (student.teacherId) recipients.set(student.teacherId, "/teacher/students");
+    const admins = await ctx.db
+      .query("users")
+      .withIndex("by_organization_and_role", (q) =>
+        q.eq("organizationId", orgId).eq("role", "admin"),
+      )
+      .collect();
+    for (const admin of admins) recipients.set(admin.externalId, "/admin/students");
+    recipients.delete(user.externalId);
+    for (const [recipientId, link] of recipients) {
+      await notifyBestEffort(ctx, {
+        organizationId: orgId,
+        recipientId,
+        kind: "student_paused",
+        payload: {
+          studentName: student.name,
+          fromDate: args.fromDate,
+          untilDate: args.untilDate,
+          by: user.role,
+        },
+        link,
+        sourceKey: `pause:${targetId}:${args.fromDate}`,
+      });
+    }
 
     return { days: pausedDays, grantsFrozen: frozen };
   },
@@ -2666,96 +2804,216 @@ export const createOneTimeLesson = mutation({
 });
 
 /** Policy-aware cancellation (§13.3). */
+const cancelForArg = v.optional(
+  v.union(v.literal("teacher"), v.literal("student"), v.literal("academy")),
+);
+
+interface CancelledLesson {
+  eventId: Id<"scheduleEvents">;
+  studentId?: string;
+  teacherId?: string;
+  date: string;
+  startTime: string;
+  charged: boolean;
+  chargeReason?: "late" | "quota";
+  trackedLate: boolean;
+}
+
+/**
+ * Apply one cancellation under the rules of whoever it is for (POLICY §5).
+ * Notifications are sent by the caller so a batch becomes one notice.
+ */
+async function cancelOneEvent(
+  ctx: MutationCtx,
+  args: {
+    orgId: string;
+    user: Doc<"users">;
+    event: Doc<"scheduleEvents">;
+    cancelFor?: CancelFor;
+    orgTz: string;
+  },
+): Promise<CancelledLesson> {
+  const { orgId, user, event } = args;
+  const actor = actionActor(user, event, "calendar.cancel.full");
+  if (isRunningOrFinished(event))
+    throw new ConvexError("A running or finished lesson cannot be cancelled");
+  const roles = cancelRoles(actor, args.cancelFor);
+  const verdict = cancelVerdict({
+    actor: roles.verdictActor,
+    event,
+    now: new Date(),
+    orgTz: args.orgTz,
+    studentRecentFreeCancels: await countRecentFreeCancels(
+      ctx,
+      orgId,
+      event.studentId,
+    ),
+    isFirstLessonWithStudent: await isFirstLesson(ctx, orgId, event),
+  });
+  if (!verdict.allowed)
+    throw new ConvexError(`${event.date} ${event.startTime}: ${verdict.reason}`);
+
+  await ctx.db.patch(event._id, {
+    status: "cancelled",
+    cancelledBy: roles.cancelledBy,
+    cancelledOnBehalfBy: roles.onBehalfBy,
+    cancelledAt: NOW(),
+    cancellationCharged: !verdict.refund,
+  });
+
+  // Refund the lesson credit only if it was actually paid (spend tx exists)
+  if (
+    verdict.refund &&
+    event.studentId &&
+    (event.pointCostSnapshot ?? 0) > 0
+  ) {
+    const txs = await ctx.db
+      .query("pointTransactions")
+      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+      .collect();
+    const spend = txs.find(
+      (t) => t.scheduleEventId === event._id && t.type === "spend",
+    );
+    const refunded = txs.some(
+      (t) =>
+        t.scheduleEventId === event._id &&
+        (t.type === "refund" ||
+          (t.type === "grant" &&
+            (t.reason ?? "").startsWith("Cancelled lesson "))),
+    );
+    if (spend && !refunded) {
+      await grantPointsInternal(ctx, {
+        orgId,
+        studentId: event.studentId,
+        points: Math.abs(spend.amount),
+        source: "refund",
+        performedBy: user.externalId,
+        notes: `Cancelled lesson ${event.date} ${event.startTime} (${roles.cancelledBy}${roles.onBehalfBy ? ` via ${roles.onBehalfBy}` : ""})`,
+        scheduleEventId: event._id,
+      });
+    }
+  }
+  return {
+    eventId: event._id,
+    studentId: event.studentId,
+    teacherId: event.teacherId,
+    date: event.date,
+    startTime: event.startTime,
+    charged: !verdict.refund,
+    chargeReason: verdict.refund
+      ? undefined
+      : verdict.reasonKey === "cancel.usedUp"
+        ? "quota"
+        : "late",
+    trackedLate: verdict.trackedLate,
+  };
+}
+
+async function userName(ctx: QueryCtx | MutationCtx, orgId: string, externalId?: string) {
+  if (!externalId) return undefined;
+  const rows = await ctx.db
+    .query("users")
+    .withIndex("by_organization_and_externalId", (q) =>
+      q.eq("organizationId", orgId).eq("externalId", externalId),
+    )
+    .collect();
+  return rows[rows.length - 1]?.name;
+}
+
+/**
+ * One notice per student/teacher pair, listing every lesson. The student hears
+ * whether the teacher couldn't make it or cancelled for them as they asked;
+ * the teacher hears when someone else cancelled; admins see every
+ * cancellation except their own.
+ */
+async function notifyCancellations(
+  ctx: MutationCtx,
+  args: {
+    orgId: string;
+    user: Doc<"users">;
+    actor: Actor;
+    cancelFor: CancelFor;
+    cancelled: CancelledLesson[];
+  },
+) {
+  const groups = new Map<string, CancelledLesson[]>();
+  for (const row of args.cancelled) {
+    const key = `${row.studentId ?? ""}|${row.teacherId ?? ""}`;
+    groups.set(key, [...(groups.get(key) ?? []), row]);
+  }
+  const admins = await ctx.db
+    .query("users")
+    .withIndex("by_organization_and_role", (q) =>
+      q.eq("organizationId", args.orgId).eq("role", "admin"),
+    )
+    .collect();
+  for (const rows of groups.values()) {
+    const sorted = rows
+      .slice()
+      .sort((a, b) => `${a.date}T${a.startTime}`.localeCompare(`${b.date}T${b.startTime}`));
+    const { studentId, teacherId } = sorted[0];
+    const base = {
+      by: args.actor,
+      for: args.cancelFor,
+      studentName: await userName(ctx, args.orgId, studentId),
+      teacherName: await userName(ctx, args.orgId, teacherId),
+      lessons: sorted.map((row) => ({ date: row.date, startTime: row.startTime, charged: row.charged })),
+      // First lesson, flat, for older readers of the payload.
+      date: sorted[0].date,
+      startTime: sorted[0].startTime,
+      charged: sorted[0].charged,
+      chargeReason: sorted.length === 1 ? sorted[0].chargeReason : undefined,
+    };
+    const sourceKey = `cancel:${sorted.map((row) => row.eventId).join(",")}`;
+    const recipients: { id: string; audience: "student" | "teacher" | "admin"; link: string }[] = [];
+    if (studentId && args.actor !== "student")
+      recipients.push({ id: studentId, audience: "student", link: "/student/calendar" });
+    if (teacherId && args.actor !== "teacher")
+      recipients.push({ id: teacherId, audience: "teacher", link: "/teacher/calendar" });
+    for (const admin of admins) {
+      if (admin.externalId === args.user.externalId) continue;
+      recipients.push({ id: admin.externalId, audience: "admin", link: "/admin/calendar" });
+    }
+    for (const r of recipients) {
+      await notifyBestEffort(ctx, {
+        organizationId: args.orgId,
+        recipientId: r.id,
+        kind: "lesson_cancelled",
+        payload: { ...base, audience: r.audience },
+        link: r.link,
+        sourceKey,
+      });
+    }
+  }
+}
+
 export const cancelEvent = mutation({
-  args: { eventId: v.id("scheduleEvents") },
-  handler: async (ctx, { eventId }) => {
+  args: { eventId: v.id("scheduleEvents"), cancelFor: cancelForArg },
+  handler: async (ctx, { eventId, cancelFor }) => {
     const { orgId, user } = await requireTenant(ctx);
     const event = await ctx.db.get(eventId);
     if (!event || event.organizationId !== orgId)
       throw new ConvexError("Event not found");
-
     const actor = actionActor(user, event, "calendar.cancel.full");
-    if (isRunningOrFinished(event))
-      throw new ConvexError("A running or finished lesson cannot be cancelled");
-    const now = new Date();
-    const verdict = cancelVerdict({
-      actor,
+    const result = await cancelOneEvent(ctx, {
+      orgId,
+      user,
       event,
-      now,
+      cancelFor,
       orgTz: await orgTimezone(ctx, orgId),
-      studentRecentFreeCancels: await countRecentFreeCancels(
-        ctx,
-        orgId,
-        event.studentId,
-      ),
-      isFirstLessonWithStudent: await isFirstLesson(ctx, orgId, event),
     });
-    if (!verdict.allowed) throw new ConvexError(verdict.reason);
-
-    await ctx.db.patch(eventId, {
-      status: "cancelled",
-      cancelledBy: actor,
-      cancelledAt: NOW(),
-      cancellationCharged: !verdict.refund,
+    await notifyCancellations(ctx, {
+      orgId,
+      user,
+      actor,
+      cancelFor: cancelRoles(actor, cancelFor).cancelFor,
+      cancelled: [result],
     });
-
-    // Refund the lesson credit only if it was actually paid (spend tx exists)
-    if (
-      verdict.refund &&
-      event.studentId &&
-      (event.pointCostSnapshot ?? 0) > 0
-    ) {
-      const txs = await ctx.db
-        .query("pointTransactions")
-        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-        .collect();
-      const spend = txs.find(
-        (t) => t.scheduleEventId === eventId && t.type === "spend",
-      );
-      const refunded = txs.some(
-        (t) =>
-          t.scheduleEventId === eventId &&
-          (t.type === "refund" ||
-            (t.type === "grant" &&
-              (t.reason ?? "").startsWith("Cancelled lesson "))),
-      );
-      if (spend && !refunded) {
-        await grantPointsInternal(ctx, {
-          orgId,
-          studentId: event.studentId,
-          points: Math.abs(spend.amount),
-          source: "refund",
-          performedBy: user.externalId,
-          notes: `Cancelled lesson ${event.date} ${event.startTime} (${actor})`,
-          scheduleEventId: eventId,
-        });
-      }
-    }
-
-    // Notify the other party
-    const recipients = [
-      actor !== "student" ? event.studentId : null,
-      actor !== "teacher" ? event.teacherId : null,
-    ].filter(Boolean) as string[];
-    for (const r of recipients) {
-      await ctx.runMutation(internal.notifications._notify, {
-        organizationId: orgId,
-        recipientId: r,
-        kind: "lesson_cancelled",
-        payload: {
-          date: event.date,
-          startTime: event.startTime,
-          by: actor,
-          charged: !verdict.refund,
-        },
-        link: r === event.teacherId ? "/teacher/calendar" : "/student/calendar",
-      });
-    }
     if (event.studentId) {
       await syncAutomaticHomeworkDeadlines(ctx, orgId, event.studentId);
       await syncLessonTitles(ctx, orgId, event.studentId);
     }
-    return { charged: !verdict.refund, trackedLate: verdict.trackedLate };
+    return { charged: result.charged, trackedLate: result.trackedLate };
   },
 });
 

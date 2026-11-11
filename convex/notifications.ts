@@ -5,6 +5,7 @@ import type { Id } from "./_generated/dataModel";
 import { requireTenant, tenantTable } from "./lib/tenant";
 import {
   NOTIFICATION_KINDS,
+  TELEGRAM_ONLY_KINDS,
   notificationContractIssues,
   type NotificationKind,
   type NotifRole,
@@ -64,6 +65,7 @@ export async function insertNotification(
     if (existing) return existing._id;
   }
 
+  const createdAt = new Date().toISOString();
   return await ctx.db.insert("notifications", {
     organizationId: args.organizationId,
     recipientId: args.recipientId,
@@ -71,9 +73,28 @@ export async function insertNotification(
     payload,
     link: args.link,
     sourceKey: args.sourceKey,
-    readAt: undefined,
-    createdAt: new Date().toISOString(),
+    // Telegram-only nudges are born read so they never light up the bell.
+    readAt: TELEGRAM_ONLY_KINDS.includes(args.kind) ? createdAt : undefined,
+    createdAt,
   });
+}
+
+/**
+ * Best-effort variant for notices attached to a core action (booking,
+ * cancelling, pausing): a recipient whose role doesn't fit the contract —
+ * say an admin who also teaches — is skipped and logged instead of rolling
+ * back the action itself.
+ */
+export async function notifyBestEffort(
+  ctx: MutationCtx,
+  args: NotificationInsertArgs,
+): Promise<Id<"notifications"> | null> {
+  try {
+    return await insertNotification(ctx, args);
+  } catch (error) {
+    console.warn(`notification skipped (${args.kind} → ${args.recipientId}): ${String(error)}`);
+    return null;
+  }
 }
 
 export const listUnread = query({
@@ -98,7 +119,7 @@ export const listRecent = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, { limit }) => {
     const { orgId, user } = await requireTenant(ctx);
-    return await ctx.db
+    const rows = await ctx.db
       .query("notifications")
       .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
       .filter((q) =>
@@ -108,7 +129,10 @@ export const listRecent = query({
         )
       )
       .order("desc")
-      .take(limit ?? 20);
+      .take((limit ?? 20) + 10);
+    return rows
+      .filter((row) => !TELEGRAM_ONLY_KINDS.includes(row.kind))
+      .slice(0, limit ?? 20);
   },
 });
 

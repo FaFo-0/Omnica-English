@@ -22,6 +22,7 @@ import {
   requireTenantPermission,
 } from "./lib/tenant";
 import { userHasPermission } from "./lib/permissions";
+import { notifyBestEffort } from "./notifications";
 import { instantToZoned } from "./lib/time";
 import {
   activationForLessonStart,
@@ -224,11 +225,24 @@ export const grantLessonAdjustment = mutation({
       ctx,
       "billing.edit"
     );
-    return await grantPointsInternal(ctx, {
+    const result = await grantPointsInternal(ctx, {
       orgId,
       performedBy: user.externalId,
       ...args,
     });
+    if (args.points > 0) {
+      // Admin notes are internal; the student sees only what kind of grant it was.
+      const reason =
+        args.source === "trial" ? "trial lesson" : args.source === "makeup" ? "make-up lesson" : args.source === "refund" ? "refund" : undefined;
+      await notifyBestEffort(ctx, {
+        organizationId: orgId,
+        recipientId: args.studentId,
+        kind: "points_granted",
+        payload: { points: args.points, ...(reason ? { reason } : {}) },
+        link: "/student/billing",
+      });
+    }
+    return result;
   },
 });
 
@@ -593,6 +607,35 @@ export async function spendPointsInternal(
     reason: args.reason,
     createdAt: NOW(),
   });
+
+  // Booking used up the balance (or nearly): tell the student while they can
+  // still top up without a gap. Admin corrections (no event) stay quiet.
+  if (args.scheduleEventId && balanceAfter <= 1) {
+    const grant = drainedFrom[drainedFrom.length - 1];
+    if (balanceAfter === 0) {
+      // A batch that goes 1 → 0 should leave one notice, not two.
+      const earlier = await ctx.db
+        .query("notifications")
+        .withIndex("by_organization_and_recipientId_and_sourceKey", (q) =>
+          q
+            .eq("organizationId", args.orgId)
+            .eq("recipientId", args.studentId)
+            .eq("sourceKey", `balance-low:1:${grant}`)
+        )
+        .unique();
+      if (earlier && !earlier.readAt && !earlier.withdrawnAt) {
+        await ctx.db.patch(earlier._id, { withdrawnAt: NOW() });
+      }
+    }
+    await notifyBestEffort(ctx, {
+      organizationId: args.orgId,
+      recipientId: args.studentId,
+      kind: "balance_low",
+      payload: { balance: balanceAfter },
+      link: "/student/billing",
+      sourceKey: `balance-low:${balanceAfter}:${grant}`,
+    });
+  }
 
   return { balanceAfter, drainedFrom };
 }

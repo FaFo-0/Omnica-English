@@ -23,6 +23,7 @@ import { chunkTranscript, utteranceIdFor } from "./lib/transcriptChunking";
 import { grantPointsInternal, spendPointsInternal, activateExpiryForEvent, revertExpiryForUnstartedEvent } from "./points";
 import { evaluateAchievements } from "./achievements";
 import { assignApprovedForLesson, reopenForLesson } from "./homework";
+import { notifyBestEffort } from "./notifications";
 import { upsertSavedVocabulary } from "./lib/vocabulary";
 import { normalizeLexeme } from "./lib/vocabularyIdentity";
 import { userHasPermission } from "./lib/permissions";
@@ -994,7 +995,18 @@ export const publish = mutation({
 
     // Approved homework travels with the lesson — one Publish sends the
     // summary, the vocabulary and the worksheet together.
-    await assignApprovedForLesson(ctx, orgId, id as Id<"lessons">, lesson.studentId);
+    const homeworkCount = await assignApprovedForLesson(ctx, orgId, id as Id<"lessons">, lesson.studentId, { notify: false });
+    if ((status ?? "published") === "published") {
+      // One notice per lesson: re-publishing after an edit stays quiet.
+      await notifyBestEffort(ctx, {
+        organizationId: orgId,
+        recipientId: lesson.studentId,
+        kind: "session_published",
+        payload: { lessonId: id, title: lesson.title, homeworkCount },
+        link: `/student/lessons/${id}`,
+        sourceKey: `published:${id}`,
+      });
+    }
 
     // Converge approved lesson vocabulary into the student's one "My Words"
     // deck. Each entry becomes (or extends) a sense-aware learner item with the

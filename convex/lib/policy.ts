@@ -60,6 +60,41 @@ export function ordinaryBookingBoundary(now: Date, orgTz: string): {
 
 export type Actor = "teacher" | "student" | "admin";
 
+/**
+ * Whose cancellation it is. A teacher cancels either for themselves ("I can't
+ * teach it": teacher rules, always refunded, counts against reliability) or
+ * for the student who asked on WhatsApp ("student asked": student rules —
+ * notice, monthly free quota, charged when late). Admins can pick either, or
+ * cancel as the academy (always refunded, nobody's metric).
+ */
+export type CancelFor = "teacher" | "student" | "academy";
+
+export interface CancelRoles {
+  cancelFor: CancelFor;
+  /** Actor whose policy rules decide refund vs charge. */
+  verdictActor: Actor;
+  /** Stored `cancelledBy` — quota, payroll and reliability read this. */
+  cancelledBy: Actor;
+  /** Who pressed the button when it differs from `cancelledBy`. */
+  onBehalfBy?: "teacher" | "admin";
+}
+
+export function cancelRoles(actor: Actor, requested?: CancelFor): CancelRoles {
+  if (actor === "student") return { cancelFor: "student", verdictActor: "student", cancelledBy: "student" };
+  if (actor === "teacher") {
+    return requested === "student"
+      ? { cancelFor: "student", verdictActor: "student", cancelledBy: "student", onBehalfBy: "teacher" }
+      : { cancelFor: "teacher", verdictActor: "teacher", cancelledBy: "teacher" };
+  }
+  if (requested === "student")
+    return { cancelFor: "student", verdictActor: "student", cancelledBy: "student", onBehalfBy: "admin" };
+  if (requested === "teacher")
+    // Admin bypasses the teacher horizon/first-lesson block but the
+    // cancellation still counts as the teacher's for reliability.
+    return { cancelFor: "teacher", verdictActor: "admin", cancelledBy: "teacher", onBehalfBy: "admin" };
+  return { cancelFor: "academy", verdictActor: "admin", cancelledBy: "admin" };
+}
+
 export interface EventLike {
   date: string; // "YYYY-MM-DD"
   startTime: string; // "HH:mm"

@@ -265,7 +265,8 @@ test("student-party manual no-show remains compatible before the teacher thresho
     await (markScheduleNoShow as unknown as Handler)._handler(ctx, { eventId: "event-1", party: "student" });
   });
   assert.equal(ctx.tables.scheduleEvents[0].status, "no_show_student");
-  assert.equal(ctx.tables.notifications.length, 0);
+  // No refund and no teacher no-show alert — only the student hears they missed it.
+  assert.deepEqual(ctx.tables.notifications.map((row) => (row as { kind?: string }).kind), ["student_no_show"]);
   assert.equal(ctx.tables.pointGrants.length, 0);
 });
 
