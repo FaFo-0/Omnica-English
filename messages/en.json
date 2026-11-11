@@ -80,6 +80,7 @@
     "sessions": "Sessions",
     "settings": "Settings",
     "guide": "Guide",
+    "rules": "Rules",
     "packs": "Lessons & packs"
   },
   "auth": {
@@ -697,7 +698,7 @@
       "nextPeriod": "Next period",
       "jumpDate": "Go to date",
       "availabilityActions": {
-        "nearTermOpened": "Within 12 hours—use Add lesson.",
+        "nearTermOpened": "Within {hours} hours—use Add lesson.",
         "repeat": "Repeat every week",
         "repeatHelp": "Use your last change on the same weekday and time every week.",
         "copy": "Copy to another date",
@@ -829,7 +830,7 @@
       "meetLinkInvalid": "Paste the full link, starting with https://",
       "recordingNote": "Recording captures <b>both sides</b> of the call, so join from a browser tab rather than the phone app when you can.",
       "consent": "I understand my lessons are <b>recorded and transcribed</b>, and that AI turns them into the student's summary, vocabulary and homework. Recordings stay inside this academy.",
-      "consentMissing": "Choose at least one day and time of day, and agree to lesson recording to start.",
+      "consentMissing": "We need your agreement on recording before you can start.",
       "consentGiven": "You agreed to this when you set up your account.",
       "teachingTitle": "Your teaching",
       "teachingBlurb": "The part your students read before their first lesson. Two minutes now saves you the same introduction fifty times.",
@@ -895,7 +896,8 @@
       "notesPlaceholder": "e.g. weekdays after work · Fridays only after 8pm",
       "referral": "How did you find us? (optional)",
       "consent": "I understand my lessons are <b>recorded and transcribed</b>, and that AI turns them into my summary, vocabulary and homework. Recordings are private to me and my academy.",
-      "consentMissing": "We need your agreement on recording before you can start.",
+      "policyAgree": "I've read the <link>lesson rules</link> — booking, cancelling, moving and pauses — and I agree to them.",
+      "consentMissing": "Choose at least one day and time of day, and agree to lesson recording and the lesson rules to start.",
       "welcomeToast": "Welcome — your profile is set up.",
       "incompleteAdult": "Enter your name, age, phone number, and a valid timezone to continue.",
       "incompleteMinor": "Enter your name, age, phone number, a valid timezone, and a parent/guardian name and phone to continue.",
@@ -1390,7 +1392,8 @@
         "cancelled": "Lesson cancelled",
         "confirmMove": "Confirm new time",
         "lateMove": "Your original reservation stays charged. The new time uses another lesson.",
-        "moved": "Lesson moved"
+        "moved": "Lesson moved",
+        "seeRules": "See the rules"
       }
     },
     "achievements": {

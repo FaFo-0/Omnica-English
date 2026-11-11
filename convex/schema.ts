@@ -172,6 +172,10 @@ export default defineSchema({
     // only student-chosen start times are constrained. Default 15.
     bookingGranularityMinutes: v.optional(v.number()),
     noShowConsumesLesson: v.boolean(),
+    // Settings → Policy: admin overrides of POLICY_DEFAULTS in
+    // convex/lib/policy.ts. Missing keys use the default.
+    policy: v.optional(v.record(v.string(), v.number())),
+    policyUpdatedAt: v.optional(v.string()),
     // Default flat pay per lesson for teachers without their own rate.
     defaultPayoutPerLesson: v.optional(v.number()),
 
@@ -319,6 +323,9 @@ export default defineSchema({
     // POLICY §8 — the teacher is on every recording too, so their agreement
     // is stored the same way the student's is: a timestamp, not a boolean.
     recordingConsentAt: v.optional(v.string()),
+    // Last time this person acknowledged a change to the lesson rules
+    // (tenantSettings.policyUpdatedAt). Drives the one-time "rules updated" banner.
+    policySeenAt: v.optional(v.string()),
     phoneWhatsapp: v.optional(v.string()),
     // Parent/guardian for under-18 students (mirrored from onboarding).
     guardianName: v.optional(v.string()),
@@ -404,6 +411,7 @@ export default defineSchema({
     teacherNotes: v.optional(v.string()),
   })
     .index("by_organization", ["organizationId"])
+    .index("by_organization_and_status", ["organizationId", "status"])
     .index("by_organization_and_externalId", ["organizationId", "externalId"])
     .index("by_organization_and_teacherId", ["organizationId", "teacherId"])
     .index("by_organization_and_studentId", ["organizationId", "studentId"])
@@ -1244,6 +1252,8 @@ export default defineSchema({
     referralSource: v.optional(v.string()),
     // POLICY §8 — recording + AI processing consent, stored with its moment.
     consentAcceptedAt: v.optional(v.string()),
+    // Lesson rules (/policy) agreed at signup.
+    policyAcceptedAt: v.optional(v.string()),
     // Set only by the finish mutation — partial step saves leave it empty
     // (2026-09-07 rebuild: the wizard saves each step as the student goes).
     completedAt: v.optional(v.string()),

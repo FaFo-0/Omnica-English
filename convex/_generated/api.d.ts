@@ -60,6 +60,7 @@ import type * as lib_notificationRegistry from "../lib/notificationRegistry.js";
 import type * as lib_onboardingPolicy from "../lib/onboardingPolicy.js";
 import type * as lib_permissions from "../lib/permissions.js";
 import type * as lib_policy from "../lib/policy.js";
+import type * as lib_policySettings from "../lib/policySettings.js";
 import type * as lib_pricing from "../lib/pricing.js";
 import type * as lib_pricingCatalogue from "../lib/pricingCatalogue.js";
 import type * as lib_pricingSeed from "../lib/pricingSeed.js";
@@ -173,6 +174,7 @@ declare const fullApi: ApiFromModules<{
   "lib/onboardingPolicy": typeof lib_onboardingPolicy;
   "lib/permissions": typeof lib_permissions;
   "lib/policy": typeof lib_policy;
+  "lib/policySettings": typeof lib_policySettings;
   "lib/pricing": typeof lib_pricing;
   "lib/pricingCatalogue": typeof lib_pricingCatalogue;
   "lib/pricingSeed": typeof lib_pricingSeed;

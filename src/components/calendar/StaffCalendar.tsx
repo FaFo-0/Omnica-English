@@ -60,6 +60,7 @@ export function StaffCalendar({
 }) {
   const availabilityText = useTranslations("components.calendar.availabilityActions");
   const me = useQuery(api.users.getMe);
+  const livePolicy = useQuery(api.policyConstants.get, {});
   const [viewerTz, setViewerTz] = useViewerTz(me?.timezone);
   const [clock, setClock] = useTimeFormat(me?.timeFormat);
   const [selectedDate, setDate] = useState<Date | null>(() => initialDate ?? null);
@@ -197,9 +198,9 @@ export function StaffCalendar({
   }, [availabilityEdits]);
   useEffect(() => {
     if (lastGesture.some((cell) => cell.open && cell.withinBookingNotice)) {
-      toast.info(availabilityText("nearTermOpened"));
+      toast.info(availabilityText("nearTermOpened", { hours: livePolicy?.bookingMinNoticeHours ?? 12 }));
     }
-  }, [lastGesture, availabilityText]);
+  }, [lastGesture, availabilityText, livePolicy?.bookingMinNoticeHours]);
   useEffect(() => {
     if (freshCells) availabilityEdits.observe(freshCells.cells);
   }, [freshCells, availabilityEdits]);
@@ -795,7 +796,13 @@ export function StaffCalendar({
                   <p className="text-sm text-muted-foreground">
                     {cancelConfirm
                       ? preview.cancel.reason
-                      : preview.reschedule.reason}
+                      : preview.reschedule.reason}{" "}
+                    <Link
+                      href={me?.role === "teacher" ? "/teacher/policy" : "/admin/settings#policy"}
+                      className="underline underline-offset-2"
+                    >
+                      Rules
+                    </Link>
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <Button

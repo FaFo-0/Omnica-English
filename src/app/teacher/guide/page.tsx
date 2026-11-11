@@ -4,11 +4,14 @@
 // finish the lesson, publish, review homework.
 //
 // Keep this to what a teacher must do or will otherwise get wrong. No
-// philosophy, no feature tour, no copy restating POLICY.md — the UI is the
+// philosophy, no feature tour, no hardcoded policy numbers (read them from
+// api.policyConstants.get) — the UI is the
 // source of truth for wording, so button and field names here must match the
 // screens exactly (Profile → meeting room, More → Use this week as weekly hours, etc.).
 
 import Link from "next/link";
+import { useQuery } from "convex-helpers/react/cache/hooks";
+import { api } from "@convex";
 import { Icon } from "@/components/shared/icons";
 
 function Step({
@@ -65,6 +68,9 @@ function Go({ href, children }: { href: string; children: React.ReactNode }) {
 }
 
 export default function TeacherGuidePage() {
+  // Live academy rules — the numbers here follow Settings → Policy.
+  const policy = useQuery(api.policyConstants.get, {});
+  const n = (value: number | undefined, unit: string) => (value === undefined ? "…" : `${value} ${unit}`);
   return (
     <div style={{ maxWidth: 780 }}>
       <h1 className="h1" style={{ margin: 0 }}>Teacher guide</h1>
@@ -94,13 +100,13 @@ export default function TeacherGuidePage() {
           can be edited for this weekly pattern without changing history.
           Use <strong>Undo</strong> for a recent saved edit, or discard past-hour
           drafts using the calendar&apos;s draft notice.{" "}
-          Students book with at least 12 hours&apos; notice, so a slot you open
+          Students book with at least {n(policy?.bookingMinNoticeHours, "hours")}&apos; notice, so a slot you open
           for today is not bookable — use <strong>Add lesson</strong> for that.
         </Step>
         <Step n={3} title="Block time off">
           <strong>More</strong> → <strong>Time off</strong>. Booked lessons
           inside the range are not cancelled for you: move or cancel them
-          first. Blocks longer than three days still apply immediately, but the
+          first. Blocks longer than {n(policy?.timeOffApprovalDays, "days")} still apply immediately, but the
           academy has to sign them off.
         </Step>
       </Section>
@@ -168,7 +174,7 @@ export default function TeacherGuidePage() {
           change something afterwards.
         </Step>
         <p className="body-sm" style={{ marginTop: 12, lineHeight: 1.6, color: "var(--omnic-gray-600)" }}>
-          Publish within 24 hours of the lesson ending — the student&apos;s
+          Publish within {n(policy?.lessonPublishHours, "hours")} of the lesson ending — the student&apos;s
           revision and their flashcards depend on it.
         </p>
       </Section>
@@ -248,6 +254,41 @@ export default function TeacherGuidePage() {
           Your avatar menu → <Go href="/teacher/profile">Profile</Go> shows what
           is owed to you, how many lessons are unpaid this month, and your last
           payment. Payments arrive as a notification.
+        </Step>
+      </Section>
+
+      <Section title="Academy rules" icon="file">
+        <p className="body-sm" style={{ marginBottom: 4, lineHeight: 1.6 }}>
+          The rules students agreed to, and yours. The full list, always up to
+          date, is on <Go href="/teacher/policy">Rules</Go>.
+        </p>
+        <Step n={1} title="When you cancel or move a lesson">
+          You can change lessons in the next {n(policy?.actionHorizonDays, "days")}.
+          The student <strong>always gets the lesson back</strong> — your
+          cancellation never costs them. With less than{" "}
+          {n(policy?.teacherCancelNoticeHours, "hours")} notice it is still
+          allowed but counts against your reliability, and you can&apos;t cancel
+          a first lesson with a new student. Agree a new time with the student
+          before you move it.
+        </Step>
+        <Step n={2} title="When the student cancels or doesn't come">
+          A student who cancels or moves at least{" "}
+          {n(policy?.studentCancelNoticeHours, "hours")} ahead gets the lesson
+          back (up to {policy?.studentFreeCancelsPer30Days ?? "…"} times per 30
+          days) and you aren&apos;t paid for that hour. Later than that, past
+          their free limit, or a no-show uses their lesson and you{" "}
+          <strong>are</strong> paid.
+        </Step>
+        <Step n={3} title="If you're late">
+          {n(policy?.noShowPingMinutes, "minutes")} after the start you get a
+          reminder. At {n(policy?.noShowWaitMinutes, "minutes")} the student is
+          refunded automatically and it counts as your no-show, unpaid.
+        </Step>
+        <Step n={4} title="What the academy expects">
+          Publish materials within {n(policy?.lessonPublishHours, "hours")},
+          check homework before the next lesson, and keep at least{" "}
+          {n(policy?.teacherMinWeeklyHours, "hours")} open in your usual week.
+          Never take students private or share their data outside the platform.
         </Step>
       </Section>
     </div>

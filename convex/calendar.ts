@@ -8,8 +8,10 @@ import { v, ConvexError } from "convex/values";
 import { query, mutation, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { requireTenant } from "./lib/tenant";
+import { loadPolicy } from "./lib/policySettings";
 import {
   POLICY,
+  resolvePolicy,
   cancelVerdict,
   rescheduleVerdict,
   withinActionHorizon,
@@ -551,7 +553,7 @@ async function buildCalendar(
       students,
       orgTz: settings?.timezone ?? "UTC",
       policy: {
-        actionHorizonDays: POLICY.actionHorizonDays,
+        actionHorizonDays: resolvePolicy(settings?.policy).actionHorizonDays,
       },
     };
   }
@@ -760,7 +762,8 @@ export const getStudentCalendar = query({
       .unique();
 
     const orgTz = settings?.timezone ?? "UTC";
-    const bookingBoundary = ordinaryBookingBoundary(new Date(), orgTz);
+    const livePolicy = resolvePolicy(settings?.policy);
+    const bookingBoundary = ordinaryBookingBoundary(new Date(), orgTz, livePolicy);
     const selfBookingActivity = (
       settings?.activityTypes ?? DEFAULT_ACTIVITY_TYPES
     ).find((activity) => activity.isActive && !activity.isGroup);
@@ -804,8 +807,8 @@ export const getStudentCalendar = query({
       orgTz: settings?.timezone ?? "UTC",
       bookingContext,
       policy: {
-        actionHorizonDays: POLICY.actionHorizonDays,
-        bookingMinNoticeHours: POLICY.bookingMinNoticeHours,
+        actionHorizonDays: resolvePolicy(settings?.policy).actionHorizonDays,
+        bookingMinNoticeHours: livePolicy.bookingMinNoticeHours,
         bookingHorizonDays: POLICY.bookingHorizonDays,
         bookingBoundaryMode: bookingBoundary.mode,
         bookingUpperExclusiveDate: bookingBoundary.upperExclusiveDate,
@@ -814,8 +817,8 @@ export const getStudentCalendar = query({
         ).toISOString(),
         bookingPolicyVersion: bookingBoundary.policyVersion,
         academyDate: bookingBoundary.academyDate,
-        freeCancelsPer30Days: POLICY.studentFreeCancelsPer30Days,
-        cancelNoticeHours: POLICY.studentCancelNoticeHours,
+        freeCancelsPer30Days: livePolicy.studentFreeCancelsPer30Days,
+        cancelNoticeHours: livePolicy.studentCancelNoticeHours,
       },
     };
   },
@@ -997,6 +1000,7 @@ export const needsAttention = query({
       days: number;
     }[] = [];
     if (user.role === "admin") {
+      const { timeOffApprovalDays } = await loadPolicy(ctx, orgId);
       const exceptions = await ctx.db
         .query("slotExceptions")
         .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
@@ -1007,7 +1011,7 @@ export const needsAttention = query({
       >();
       for (const e of exceptions) {
         if (!e.timeOffGroupId || e.timeOffApprovedAt) continue;
-        if ((e.timeOffDays ?? 0) <= POLICY.timeOffApprovalDays) continue;
+        if ((e.timeOffDays ?? 0) <= timeOffApprovalDays) continue;
         const g = groups.get(e.timeOffGroupId) ?? {
           teacherId: e.teacherId,
           days: e.timeOffDays ?? 0,
@@ -1092,11 +1096,13 @@ export const actionPreview = query({
           : "student";
     const now = new Date();
     const orgTz = await orgTimezone(ctx, orgId);
+    const policy = await loadPolicy(ctx, orgId);
     const cancel = cancelVerdict({
       actor,
       event,
       now,
       orgTz,
+      policy,
       studentRecentFreeCancels: await countRecentFreeCancels(
         ctx,
         orgId,
@@ -1104,7 +1110,7 @@ export const actionPreview = query({
       ),
       isFirstLessonWithStudent: await isFirstLesson(ctx, orgId, event),
     });
-    const reschedule = rescheduleVerdict({ actor, event, now, orgTz });
+    const reschedule = rescheduleVerdict({ actor, event, now, orgTz, policy });
     if (isRunningOrFinished(event)) {
       cancel.allowed = false;
       cancel.reason = "A running or finished lesson cannot be cancelled";
@@ -1321,7 +1327,7 @@ export const blockTimeOff = mutation({
     // a long absence also lands in the admin's needs-attention list so it can
     // be acknowledged (the block still applies immediately — nobody is left
     // teaching while sick waiting for a sign-off).
-    const needsApproval = days > POLICY.timeOffApprovalDays;
+    const needsApproval = days > (await loadPolicy(ctx, orgId)).timeOffApprovalDays;
     const admins = await ctx.db
       .query("users")
       .withIndex("by_organization_and_role", (q) =>
@@ -1469,6 +1475,7 @@ async function validateBatchItem(
   orgTz: string,
   bookingUpperExclusiveMs: number,
 ): Promise<{ ok: true } | { ok: false; reason: string; reasonKey: string }> {
+  const policy = resolvePolicy(settings?.policy);
   const lessonMinutes = POLICY.reservationMinutes;
   const granularity = POLICY.bookingGranularityMinutes;
   const startMin = timeToMin(item.startTime);
@@ -1489,10 +1496,10 @@ async function validateBatchItem(
     };
   }
   const noticeHours = (startMs - now.getTime()) / 3_600_000;
-  if (noticeHours < POLICY.bookingMinNoticeHours) {
+  if (noticeHours < policy.bookingMinNoticeHours) {
     return {
       ok: false,
-      reason: `Lessons must be booked at least ${POLICY.bookingMinNoticeHours} hours in advance`,
+      reason: `Lessons must be booked at least ${policy.bookingMinNoticeHours} hours in advance`,
       reasonKey: "booking.notice",
     };
   }
@@ -1531,10 +1538,10 @@ async function validateBatchItem(
     };
   }
   const sameDay = ownActive.filter((e) => e.date === item.date).length;
-  if (sameDay >= POLICY.maxStudentBookingsPerDay) {
+  if (sameDay >= policy.maxStudentBookingsPerDay) {
     return {
       ok: false,
-      reason: `You already have a lesson on ${item.date} — one lesson per day`,
+      reason: `You already have ${policy.maxStudentBookingsPerDay} lesson(s) on ${item.date} — the daily limit`,
       reasonKey: "booking.perDay",
     };
   }
@@ -1543,10 +1550,10 @@ async function validateBatchItem(
   const sameWeek = ownActive.filter(
     (e) => e.date >= wkStart && e.date <= wkEnd,
   ).length;
-  if (sameWeek >= POLICY.maxStudentBookingsPerWeek) {
+  if (sameWeek >= policy.maxStudentBookingsPerWeek) {
     return {
       ok: false,
-      reason: `Maximum ${POLICY.maxStudentBookingsPerWeek} lessons per week reached`,
+      reason: `Maximum ${policy.maxStudentBookingsPerWeek} lessons per week reached`,
       reasonKey: "booking.perWeek",
     };
   }
@@ -1650,7 +1657,7 @@ async function validateBatch(
   );
   const orgTz = settings?.timezone ?? "UTC";
   const now = new Date();
-  const bookingBoundary = ordinaryBookingBoundary(now, orgTz);
+  const bookingBoundary = ordinaryBookingBoundary(now, orgTz, resolvePolicy(settings?.policy));
   const reviewContext = {
     ...resolveSelfBookingContext(settings, orgTz),
     teacherId,
@@ -2038,8 +2045,6 @@ export const getBookingRequest = query({
 // legitimate outlet. It freezes the expiry clock on every active grant and
 // stops the materializer, while HOLDING the weekly slot.
 
-export const PAUSE_MAX_DAYS = 14;
-export const PAUSE_MAX_PER_180_DAYS = 2;
 
 export const pauseStudent = mutation({
   args: {
@@ -2075,9 +2080,10 @@ export const pauseStudent = mutation({
           86_400_000,
       ) + 1;
     if (Number.isNaN(days)) throw new ConvexError("Invalid dates");
+    const { pauseMaxDays, pausesPer6Months } = await loadPolicy(ctx, orgId);
     // Admins may override the cap; students are held to policy.
-    if (user.role !== "admin" && days > PAUSE_MAX_DAYS) {
-      throw new ConvexError(`A pause can last at most ${PAUSE_MAX_DAYS} days`);
+    if (user.role !== "admin" && days > pauseMaxDays) {
+      throw new ConvexError(`A pause can last at most ${pauseMaxDays} days`);
     }
 
     // Rolling 6-month quota, counted from the ledger of past pauses.
@@ -2092,9 +2098,9 @@ export const pauseStudent = mutation({
         )
         .collect();
       const recent = past.filter((p) => p.fromDate >= since).length;
-      if (recent >= PAUSE_MAX_PER_180_DAYS) {
+      if (recent >= pausesPer6Months) {
         throw new ConvexError(
-          `Only ${PAUSE_MAX_PER_180_DAYS} pauses are allowed every 6 months — talk to your academy`,
+          `Only ${pausesPer6Months} pauses are allowed every 6 months — talk to your academy`,
         );
       }
     }
@@ -2683,6 +2689,7 @@ export const cancelEvent = mutation({
       event,
       now,
       orgTz: await orgTimezone(ctx, orgId),
+      policy: await loadPolicy(ctx, orgId),
       studentRecentFreeCancels: await countRecentFreeCancels(
         ctx,
         orgId,
@@ -2776,16 +2783,17 @@ async function validateMove(
     throw new ConvexError("A running or finished lesson cannot be moved");
   const now = new Date(),
     orgTz = await orgTimezone(ctx, orgId);
-  const verdict = rescheduleVerdict({ actor, event, now, orgTz });
+  const policy = await loadPolicy(ctx, orgId);
+  const verdict = rescheduleVerdict({ actor, event, now, orgTz, policy });
   if (!verdict.allowed) throw new ConvexError(verdict.reason);
   if (!isValidAcademyDate(toDate))
     throw new ConvexError("Invalid academy date");
   const start = requireSlotStart(toStartTime),
     end = start + POLICY.reservationMinutes;
   const target = { ...event, date: toDate, startTime: toStartTime };
-  if (actor === "teacher" && !withinActionHorizon(target, now, orgTz))
+  if (actor === "teacher" && !withinActionHorizon(target, now, orgTz, policy))
     throw new ConvexError(
-      `New time must be within the next ${POLICY.actionHorizonDays} days`,
+      `New time must be within the next ${policy.actionHorizonDays} days`,
     );
   if (wallTimeToMs(toDate, toStartTime, orgTz) <= now.getTime())
     throw new ConvexError("New time must be in the future");
@@ -2831,12 +2839,12 @@ async function validateMove(
       );
       if (
         own.filter((e) => e.date === toDate).length >=
-        POLICY.maxStudentBookingsPerDay
+        policy.maxStudentBookingsPerDay
       )
         throw new ConvexError("You already have a lesson on that date");
       if (
         own.filter((e) => mondayKey(e.date) === mondayKey(toDate)).length >=
-        POLICY.maxStudentBookingsPerWeek
+        policy.maxStudentBookingsPerWeek
       )
         throw new ConvexError("Maximum lessons per week reached");
       if (verdict.chargesLesson) {

@@ -6,6 +6,7 @@ import { MobileSidebarProvider } from "@/components/layout/mobile-sidebar";
 import { RoleGuard } from "@/components/auth/role-guard";
 import { PortalShell } from "@/components/shared/PortalShell";
 import { TEACHER_SIDEBAR } from "./sidebar-config";
+import { PolicyUpdatedBanner } from "@/components/policy/PolicyUpdatedBanner";
 
 export default function TeacherLayout({
   children,
@@ -25,6 +26,7 @@ export default function TeacherLayout({
           <TeacherBrowserGate role={user?.role}>{children}</TeacherBrowserGate>
         ) : (
           <PortalShell sections={TEACHER_SIDEBAR}>
+            <PolicyUpdatedBanner rulesHref="/teacher/policy" />
             <TeacherBrowserGate role={user?.role}>{children}</TeacherBrowserGate>
           </PortalShell>
         )}

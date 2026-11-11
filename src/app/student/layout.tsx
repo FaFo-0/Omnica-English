@@ -9,6 +9,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "convex-helpers/react/cache/hooks";
 import { api } from "@convex";
 import { useAuth } from "@/lib/auth";
+import { PolicyUpdatedBanner } from "@/components/policy/PolicyUpdatedBanner";
 
 /** Resume a public pack choice after auth/onboarding, without buying anything. */
 function ResumePackChoice() {
@@ -42,6 +43,7 @@ export default function StudentLayout({
           sections={STUDENT_SIDEBAR}
           bottomNav={STUDENT_BOTTOM_NAV}
         >
+          <PolicyUpdatedBanner rulesHref="/student/policy" />
           {children}
         </PortalShell>
       </MobileSidebarProvider>

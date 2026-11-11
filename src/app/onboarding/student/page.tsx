@@ -88,6 +88,7 @@ export default function StudentOnboardingPage() {
   const [referral, setReferral] = useState("");
   const [attributionValue, setAttributionValue] = useState("");
   const [consent, setConsent] = useState(false);
+  const [policyAgreed, setPolicyAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [savingStep, setSavingStep] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -141,6 +142,7 @@ export default function StudentOnboardingPage() {
     setTimes(existing.preferredTimeOfDay ?? []);
     setReferral(existing.referralSource ?? "");
     if (existing.consentAcceptedAt) setConsent(true);
+    if (existing.policyAcceptedAt) setPolicyAgreed(true);
     setHydrated(true);
   }, [existing, hydrated, user?.name]);
 
@@ -362,7 +364,7 @@ export default function StudentOnboardingPage() {
         key: "when",
         title: t("whenTitle"),
         blurb: t("whenBlurb"),
-        canAdvance: consent && days.length > 0 && times.length > 0,
+        canAdvance: consent && policyAgreed && days.length > 0 && times.length > 0,
         incompleteHint: t("consentMissing"),
         body: (
           <>
@@ -435,11 +437,41 @@ export default function StudentOnboardingPage() {
                 {t.rich("consent", { b: (chunks) => <strong>{chunks}</strong> })}
               </span>
             </label>
+            {/* POLICY — the lesson rules, agreed once at signup and stored with a timestamp. */}
+            <label
+              style={{
+                display: "flex",
+                gap: 10,
+                alignItems: "flex-start",
+                padding: 12,
+                borderRadius: 8,
+                border: "1px solid var(--omnic-gray-200)",
+                background: "var(--omnic-gray-50)",
+                cursor: "pointer",
+                marginTop: 8,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={policyAgreed}
+                onChange={(e) => setPolicyAgreed(e.target.checked)}
+                style={{ marginTop: 3 }}
+              />
+              <span className="body-sm">
+                {t.rich("policyAgree", {
+                  link: (chunks) => (
+                    <a href={`/policy?lang=${locale}`} target="_blank" rel="noreferrer" className="link" style={{ fontWeight: 700 }}>
+                      {chunks}
+                    </a>
+                  ),
+                })}
+              </span>
+            </label>
           </>
         ),
       },
     ],
-    [t, tLanguages, name, phone, tz, age, ageNum, isMinor, guardianName, guardianPhone, cefr, l1, goal, interests, days, times, notes, referral, consent]
+    [t, tLanguages, locale, name, phone, tz, age, ageNum, isMinor, guardianName, guardianPhone, cefr, l1, goal, interests, days, times, notes, referral, consent, policyAgreed]
   );
 
   if (!isLoaded || !user || user.role !== "student") return null;
@@ -464,6 +496,7 @@ export default function StudentOnboardingPage() {
         referralSource: attributionValue || referral || undefined,
         timezone: tz,
         consent,
+        policyAccepted: policyAgreed,
       });
       // No "free trial added" copy — what happens next depends on the
       // academy's payment policy, not a number we promised on the way in.

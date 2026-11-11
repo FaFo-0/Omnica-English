@@ -64,9 +64,13 @@ export function assertGenericEventStatus(status: string | undefined): void {
   }
 }
 
-export function assertTeacherNoShowDue(nowMs: number, startMs: number): void {
-  if (nowMs - startMs < POLICY.noShowWaitMinutes * 60_000) {
-    throw new Error(`Teacher no-show is not due before the ${POLICY.noShowWaitMinutes}-minute policy grace`);
+export function assertTeacherNoShowDue(
+  nowMs: number,
+  startMs: number,
+  noShowWaitMinutes: number = POLICY.noShowWaitMinutes
+): void {
+  if (nowMs - startMs < noShowWaitMinutes * 60_000) {
+    throw new Error(`Teacher no-show is not due before the ${noShowWaitMinutes}-minute policy grace`);
   }
 }
 

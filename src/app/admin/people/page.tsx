@@ -67,6 +67,7 @@ export default function AdminPeoplePage() {
   const pauseStudent = useMutation(api.calendar.pauseStudent);
   const resumeStudent = useMutation(api.calendar.resumeStudent);
   const [pauseFor, setPauseFor] = useState<any>(null);
+  const livePolicy = useQuery(api.policyConstants.get, {});
   const [pauseFrom, setPauseFrom] = useState("");
   const [pauseUntil, setPauseUntil] = useState("");
   const [pauseReason, setPauseReason] = useState("");
@@ -606,7 +607,8 @@ export default function AdminPeoplePage() {
             <div className="space-y-3 mt-2">
               <p className="body-sm">
                 Freezes the lesson-expiry clock. Existing booked lessons stay in place; move or cancel them separately. The student auto-resumes at the
-                end date. Policy: 14 days, twice per 6 months — admins may
+                end date. Policy: up to {livePolicy?.pauseMaxDays ?? "…"} days,{" "}
+                {livePolicy?.pausesPer6Months ?? "…"} per 6 months — admins may
                 override.
               </p>
               <div className="flex gap-3">

@@ -3,6 +3,7 @@ import type { MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { insertNotification } from "../notifications";
 import { refundPointsForEventInternal } from "../points";
+import { loadPolicy } from "./policySettings";
 import {
   teacherGenuineNoShowSourceKey,
   teacherLateStartSourceKey,
@@ -149,7 +150,8 @@ export async function transitionNoShowForEvent(
     // from the stored academy wall-clock event and tenant timezone here, so
     // manual/admin and automatic producers share the same server-side instant.
     const startMs = await eventStartMs(ctx, args.organizationId, event);
-    assertTeacherNoShowDue(transitionNowMs, startMs);
+    const { noShowWaitMinutes } = await loadPolicy(ctx, args.organizationId);
+    assertTeacherNoShowDue(transitionNowMs, startMs, noShowWaitMinutes);
   }
 
   const desiredStatus = args.party === "teacher" ? "no_show_teacher" : "no_show_student";

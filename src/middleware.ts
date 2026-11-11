@@ -6,6 +6,7 @@ const isPublicRoute = createRouteMatcher([
   "/trial",
   "/privacy",
   "/terms",
+  "/policy",
   "/opengraph-image",
   "/sign-in(.*)",
   "/sign-up(.*)",

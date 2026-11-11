@@ -23,6 +23,7 @@ import {
 } from "./lib/tenant";
 import { userHasPermission } from "./lib/permissions";
 import { instantToZoned } from "./lib/time";
+import { loadPolicy } from "./lib/policySettings";
 import {
   activationForLessonStart,
   stateAfterUnstart,
@@ -788,7 +789,17 @@ export const expireDailyCron = internalMutation({
     // Walk every org's grants in one pass — cron isn't tenant-scoped.
     const all = await ctx.db.query("pointGrants").collect();
 
-    // POLICY §2 [PROPOSED → v1] — expiry warnings (14 days, then 3 days).
+    // POLICY §2 — expiry warnings at two admin-set horizons (default 14, 3 days).
+    const warnByOrg = new Map<string, number[]>();
+    const warnDaysFor = async (orgId: string) => {
+      let days = warnByOrg.get(orgId);
+      if (!days) {
+        const p = await loadPolicy(ctx, orgId);
+        days = [p.expiryWarnFirstDays, p.expiryWarnSecondDays];
+        warnByOrg.set(orgId, days);
+      }
+      return days;
+    };
     // Exactly-once per grant per horizon via sourceKey; the sentinel
     // NO_EXPIRY grants (un-activated packs, grandfathered rows) never warn.
     let warned = 0;
@@ -801,7 +812,7 @@ export const expireDailyCron = internalMutation({
           new Date(`${today}T00:00:00Z`).getTime()) /
           86_400_000
       );
-      if (days !== 14 && days !== 3) continue;
+      if (!(await warnDaysFor(g.organizationId)).includes(days)) continue;
       await ctx.runMutation(internal.notifications._notify, {
         organizationId: g.organizationId,
         recipientId: g.studentId,

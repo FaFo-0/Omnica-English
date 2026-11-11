@@ -36,7 +36,7 @@
 - **[DECIDED 2026-09-26]** Expiry limits unreserved balance, not a successfully reserved lesson. Booking reserves the eligible credit; a paid booked lesson remains paid if its grant later expires. Expiry starts only on real use, and a refund after expiry does not revive expired balance. Advance booking remains limited by the calendar boundary and ordinary caps.
 - **[DECIDED 2026-10-09]** Standard pack expiry follows §1: 60 days for 8/12 lessons, 90 days for 24. Custom packs get explicit admin-set expiry.
 - **[DECIDED]** Existing `NO_EXPIRY` grants are **grandfathered** — no retroactive expiry on promises already made.
-- **[PROPOSED]** Expiry warnings: notification at 14 days and 3 days before credits lapse. Expired credits are gone (that's the point), but admin may re-grant as goodwill — deliberate human decision, never automatic.
+- **[DECIDED 2026-11-11]** Expiry warnings: notification at 14 days and 3 days before credits lapse (both admin-settable). Expired credits are gone (that's the point), but admin may re-grant as goodwill — deliberate human decision, never automatic.
 - **Why expiry instead of a retention status machine:** an expiring balance is a stronger nudge than any "On Break" notification, bounds deferred-revenue liability, and self-resolves dormant students without a cron. At 50 students, a human plus a good list replaces the whole EnglishDom On Break/On Hold apparatus.
 
 - **[DECIDED 2026-10-29]** Currency selection is available on the public prices page and student billing. Enabled currencies are academy-managed. An order retains the selected price/currency; admin records the actual amount, currency and payment date when verifying it. A changed price must be reviewed again before a new request is submitted.
@@ -53,8 +53,8 @@
 ## 4. Teacher compensation
 
 - **[DECIDED 2026-10-08]** Teachers receive an individually agreed fixed amount per payable lesson, independent of student pack prices. Percentage revenue sharing is retired. Egyptian teachers are paid in USD; Kazakh teacher agreements may be in KZT.
-- **[OPEN 2026-10-08]** Exact teacher rates remain to be agreed. FaFo identified at least 2,500 KZT as the expected level for Kazakh teachers teaching beginners; this is not an automatic platform-wide rate. Trials use each teacher’s normal fixed lesson rate.
-- **[DECIDED]** What counts as payable for standard lessons (paid-trial exceptions remain open above):
+- **[DECIDED 2026-11-11]** There is no platform-wide teacher rate: each teacher's rate is part of their individual agreement (expected level for Kazakh teachers teaching beginners: at least 2,500 KZT). Trials use each teacher’s normal fixed lesson rate.
+- **[DECIDED]** What counts as payable for standard lessons (trials included):
   | Event | Teacher paid? | Rationale |
   |---|---|---|
   | Lesson completed | ✅ full | — |
@@ -65,8 +65,8 @@
   | Unpaid ad-hoc lesson (zero-balance one-time) | ⏸ paid once admin settles it | Prevents gaming |
 - **[DECIDED]** **Late-move rule** (closes the no-show laundering loophole): a move with **<6h notice is treated as a charged cancel** — credit burned, teacher paid — and the student books the new slot with a fresh credit. Without this, "Move" one hour before start beats "no-show" every time: teacher eats the dead hour unpaid while the student keeps the credit.
 - **[DECIDED 2026-10-08]** Payout terms are per teacher: fixed lesson amount, agreement currency and payment channel. **[UPDATED 2026-10-29 — FaFo]** USD is the accounting base. Payments retain actual amount, currency, transaction date and a frozen USD equivalent using the recorded dated exchange rate. Teacher agreements retain their own currency. Daily rate updates affect new conversions, not recorded payments.
-- **[PROPOSED]** Payout cycle: **monthly**, computed from `scheduleEvents` audit fields (completed / no_show_student with charge). No new schema — reports derive from the ledger.
-- **[OPEN]** Minimum availability requirement for teachers (e.g. ≥10 open hours/week to stay listed)? FaFo to decide at first teacher onboarding.
+- **[DECIDED 2026-11-11]** Payout cycle: **monthly**, computed from `scheduleEvents` audit fields (completed / no_show_student with charge). No new schema — reports derive from the ledger.
+- **[DECIDED 2026-11-11]** Teachers keep at least **10 open hours per week** (admin-settable). A teacher below it is flagged to the admin, never hidden or blocked automatically.
 
 ## 5. Calendar & scheduling
 
@@ -94,13 +94,13 @@
 ## 7. Student lifecycle (simplified — no status machine)
 
 - **[DECIDED]** Statuses stay as-is: `trial / active / paused / cancelled`. **On Break / On Hold auto-statuses are dropped** — EnglishDom needs them at thousands of students; we have an admin who can read a list.
-- **[PROPOSED]** Replacement: an admin **attention list** (extend existing needs-attention inbox): students with no lesson in 14+ days, expiring credits, unpaid ad-hoc lessons, students unable to book because their balance is zero. Human decides; system never auto-transitions a student.
+- **[DECIDED 2026-11-11]** Replacement: an admin **attention list** (extend existing needs-attention inbox): students with no lesson in 14+ days, expiring credits, unpaid ad-hoc lessons, students unable to book because their balance is zero. Human decides; system never auto-transitions a student.
 - **[DECIDED]** **Academy holidays table dropped** — at ≤5 teachers, "everyone blocks Eid" is the existing time-off feature used five times.
 
 ## 8. Recording, AI & data
 
 - **[DECIDED]** Lessons are recorded and transcribed (Soniox) and AI-processed (summaries, vocab, flashcards, quizzes via OpenRouter). This is the product.
-- **[PROPOSED]** Consent: recording/AI-processing consent is part of student onboarding — checkbox + one plain-language sentence, stored with timestamp. Minors: parent consent (CA market will have teens).
+- **[DECIDED 2026-11-11]** Consent: recording/AI-processing consent is part of student onboarding — checkbox + one plain-language sentence, stored with timestamp. Minors: parent consent (CA market will have teens).
 - **[DECIDED]** Recording retention: **keep everything indefinitely**; FaFo manages storage manually. Ballpark to watch: a 60-min lesson ≈ 30–60 MB of audio → 50 students × 8 lessons/month ≈ **~300 GB/year** accumulating in Convex storage. Revisit when the storage line item becomes visible on the bill (see §12).
 - **[FACT — FaFo, 2026-10-08]** Current platform operating costs are almost zero after switching providers away from paid features. AI costs are low and the domain is already paid for. Previous per-lesson provider estimates are obsolete; actual charges must be distinguished from estimates.
 
@@ -115,27 +115,27 @@
 > The platform auto-generates post-lesson content (summary, vocabulary, flashcards, quiz) from the transcript. The teacher's job is judgment, not authoring.
 
 - **[DECIDED]** Homework is part of the product — every completed lesson produces reviewable material for the student.
-- **[PROPOSED]** Teacher obligations per completed lesson:
+- **[DECIDED 2026-11-11]** Teacher obligations per completed lesson (the 24h deadline is admin-settable):
   1. **Review and publish** the AI-generated content within **24 hours** of lesson end (fix AI mistakes, cut irrelevant vocab — publish, don't rewrite).
   2. **Check the student's submitted homework before the next lesson** with that student; unreviewed submissions surface in the teacher's needs-attention view.
   3. Persistent lateness (>48h publishing, unreviewed homework at lesson start) counts against reliability alongside late cancels.
-- **[PROPOSED]** No homework obligations on the student — homework completion is tracked and visible to teacher/admin (retention signal), never punished.
+- **[DECIDED 2026-11-11]** No homework obligations on the student — homework completion is tracked and visible to teacher/admin (retention signal), never punished.
 
 ## 11. Code of conduct & dispute escalation
 
-**Teachers — [PROPOSED]:**
+**Teachers — [DECIDED 2026-11-11]:**
 - Camera on, punctual (the no-show ladder in §5 is the enforcement), professional conduct; sessions happen **on the academy's Meet room and on the record** — that recording is also the teacher's protection.
 - **No off-platform solicitation.** Taking academy students private (direct payment, "let's do this outside") is the one immediately-terminating offense. All lesson payment flows through the academy.
 - No sharing of student data (contacts, recordings, transcripts) outside the platform.
 
-**Students — [PROPOSED]:**
+**Students — [DECIDED 2026-11-11]:**
 - Harassment or abuse of a teacher: one written warning from admin; repeat → removal. Remaining **unused** credits refunded on removal (we take the loss to end it cleanly); used credits are not.
 - Chronic no-show behavior is handled economically (§5 charges), not morally — no lectures, the quota system is the policy.
 
-**Escalation path — [PROPOSED]:**
+**Escalation path — [DECIDED 2026-11-11]:**
 1. Anything teacher↔student that isn't policy-automatic goes to **admin within 48h** via the platform (later: WhatsApp).
 2. Admin decides refunds/credits per §3; recordings and transcripts are the evidence record — this is why §8 consent matters.
-3. FaFo is the final word. At 50 students there is no committee; the policy just names the referee.
+3. The academy administration has the final word. At 50 students there is no committee; the policy just names the referee. Student- and teacher-facing copy never names an individual.
 
 ## 12. Deliberately not doing (with revisit triggers)
 

@@ -7,6 +7,7 @@ import { api } from "@convex";
 import { Icon } from "@/components/shared/icons";
 import { toast } from "sonner";
 import { CurrencySettings } from "@/components/billing/CurrencySettings";
+import { PolicySettings } from "@/components/policy/PolicySettings";
 import { userHasPermission } from "../../../../convex/lib/permissions";
 
 export default function AdminSettingsPage() {
@@ -26,6 +27,7 @@ export default function AdminSettingsPage() {
       </div>
 
       <BrandingSection settings={settings} update={updateSettings} />
+      {me && userHasPermission(me, "scheduling.edit") && <PolicySettings />}
       {me?.role === "admin" && userHasPermission(me, "billing.edit") && <CurrencySettings />}
       <TeacherInviteSection />
       <AIManagerSection
@@ -35,7 +37,6 @@ export default function AdminSettingsPage() {
         refreshAiModels={refreshAiModels}
       />
       <AchievementsSection achievements={achievements} remove={removeAchievement} />
-      <SchedulingSection />
     </div>
   );
 }
@@ -820,62 +821,5 @@ function AchievementDialog({ achievement, onClose }: { achievement: any | null; 
         </button>
       </div>
     </Modal>
-  );
-}
-
-// ── Scheduling ───────────────────────────────────────────────────────
-
-function SchedulingSection() {
-  const policy = useQuery(api.policyConstants.get, {});
-
-  // Everything below is compiled into convex/lib/policy.ts from POLICY.md —
-  // shown so the page reports the rules the server really applies. Changing
-  // one means editing POLICY.md, not a field here.
-  const fixed: [string, string][] = policy
-    ? [
-        ["Student cancellation notice", `${policy.studentCancelNoticeHours} h`],
-        ["Free student cancellations", `${policy.studentFreeCancelsPer30Days} per 30 days`],
-        ["Teacher cancellation notice", `${policy.teacherCancelNoticeHours} h`],
-        ["Student cancel / move", "Any future lesson"],
-        ["Teacher cancel / move horizon", `${policy.actionHorizonDays} days ahead`],
-        ["Student booking notice", `${policy.bookingMinNoticeHours} h`],
-        ["Booking horizon", "Through the end of the following academy month"],
-        ["Reservation / teaching", `${policy.reservationMinutes} / ${policy.teachingMinutes} min`],
-        ["Scheduling grid", `${policy.bookingGranularityMinutes} min · back-to-back allowed`],
-        ["No-show wait", `${policy.noShowWaitMinutes} min (ping at ${policy.noShowPingMinutes})`],
-        ["Time off needing sign-off", `longer than ${policy.timeOffApprovalDays} days`],
-      ]
-    : [];
-
-  return (
-    <div className="card" id="scheduling" style={{ padding: 24 }}>
-      <div className="h3" style={{ marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
-        <Icon name="clock" size={18} stroke="var(--omnic-tenant-primary)" /> Scheduling Policies
-      </div>
-      <p className="body-sm" style={{ marginBottom: 16 }}>Current scheduling rules · adjacent lessons are allowed</p>
-
-      <div className="card" style={{ padding: 16, background: "var(--omnic-gray-50)" }}>
-        <div className="h3" style={{ fontSize: 14, marginBottom: 4 }}>Set by POLICY, not here</div>
-        <p className="body-sm" style={{ marginBottom: 10 }}>
-          Cancellation, no-show and booking rules are the same for every tenant
-          and live in POLICY.md. These are the values the server enforces today.
-        </p>
-        {policy === undefined ? (
-          <div className="body-sm">Loading…</div>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "6px 20px" }}>
-            {fixed.map(([label, value]) => (
-              <div
-                key={label}
-                style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "6px 0" }}
-              >
-                <span className="body-sm">{label}</span>
-                <strong style={{ fontSize: 13, whiteSpace: "nowrap" }}>{value}</strong>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
   );
 }
