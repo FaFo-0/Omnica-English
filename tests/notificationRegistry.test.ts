@@ -196,3 +196,10 @@ test("unknown kinds fall back safely instead of crashing the bell", () => {
   assert.equal(view.title, "Made up kind");
   assert.equal(view.body, "legacy row");
 });
+// A staff-booked lesson plan sends one notification for all its lessons.
+test("lesson_assigned names the lesson count for a booked plan", () => {
+  const plan = notificationView("lesson_assigned", { by: "teacher", date: "2026-11-16", startTime: "18:00", count: 8 });
+  assert.match(plan.body, /booked 8 lessons, starting/);
+  const single = notificationView("lesson_assigned", { by: "teacher", date: "2026-11-16", startTime: "18:00" });
+  assert.match(single.body, /booked a lesson/);
+});

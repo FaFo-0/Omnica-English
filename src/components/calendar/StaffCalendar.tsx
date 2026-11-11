@@ -30,7 +30,7 @@ import {
   type ProjectedCalendarSlot,
 } from "@/lib/calendarSlots";
 import { CalendarAvailabilityEdits, type AvailabilityEdit } from "@/lib/calendarAvailabilityEdits";
-import { zonedToInstant, instantToZoned } from "@/lib/tz";
+import { zonedToInstant, instantToZoned, convertZoned } from "@/lib/tz";
 import { sessionStartWindow } from "@/lib/sessionStart";
 import { errText } from "@/lib/convexError";
 import { formatTime } from "@/lib/timeFormat";
@@ -87,6 +87,11 @@ export function StaffCalendar({
   const [target, setTarget] = useState<ProjectedCalendarSlot | null>(null);
   const [adding, setAdding] = useState(false);
   const [studentId, setStudentId] = useState("");
+  // Lesson plan: the weekly times picked for the student, optionally repeated
+  // weekly until a date (viewer timezone), minus individual skipped dates.
+  const [picks, setPicks] = useState<ProjectedCalendarSlot[]>([]);
+  const [repeatUntil, setRepeatUntil] = useState("");
+  const [skipped, setSkipped] = useState<string[]>([]);
   const allUsers = useQuery(api.users.listAllUsers, admin ? {} : "skip");
   const roster = useQuery(
     api.users.getStudentsForTeacher,
@@ -142,7 +147,7 @@ export function StaffCalendar({
   const replaceWeekly = useMutation(api.vacancies.replaceForTeacher);
   const reschedule = useMutation(api.calendar.rescheduleEvent),
     cancel = useMutation(api.calendar.cancelEvent);
-  const addLesson = useMutation(api.calendar.createOneTimeLesson),
+  const bookPlan_ = useMutation(api.lessonPlan.bookLessonPlan),
     rename = useMutation(api.calendar.renameEvent),
     start = useMutation(api.lessons.create);
   const timeOff = useMutation(api.calendar.blockTimeOff),
@@ -275,34 +280,81 @@ export function StaffCalendar({
   }
   function selectCell(cell: ProjectedCalendarSlot) {
     if (refreshing) return;
-    if (moving || (adding && studentId)) {
+    if (adding && studentId) {
+      if (!cell.canMove) return;
+      const key = `${cell.date}|${cell.startTime}`;
+      setPicks((current) =>
+        current.some((pick) => `${pick.date}|${pick.startTime}` === key)
+          ? current.filter((pick) => `${pick.date}|${pick.startTime}` !== key)
+          : [...current, cell],
+      );
+      setSkipped([]);
+      planRequest.current = "";
+      return;
+    }
+    if (moving) {
       if (cell.canMove) setTarget(cell);
       return;
     }
     if (cell.editable) void paint([cell], !cell.open);
   }
-  const lessonRequest = useRef({ key: "", id: "" });
-  async function saveLesson() {
-    if (!target || !studentId) return;
-    const key = `${studentId}|${target.date}|${target.startTime}`;
-    if (lessonRequest.current.key !== key)
-      lessonRequest.current = { key, id: crypto.randomUUID() };
-    const requestId = lessonRequest.current.id;
+  const planRequest = useRef("");
+  const planBookings = useMemo(() => {
+    const out = new Map<string, { date: string; startTime: string }>();
+    for (const pick of picks) {
+      if (!repeatUntil) {
+        out.set(`${pick.date}|${pick.startTime}`, { date: pick.date, startTime: pick.startTime });
+        continue;
+      }
+      // Step in the viewer's own calendar so DST never drifts the usual time.
+      for (
+        let day = pick.viewerDate;
+        day <= repeatUntil && out.size < 60;
+        day = new Date(Date.parse(`${day}T00:00:00Z`) + 7 * 86400000).toISOString().slice(0, 10)
+      ) {
+        const academy = convertZoned(day, pick.viewerStartTime, viewerTz, orgTz);
+        out.set(`${academy.date}|${academy.time}`, { date: academy.date, startTime: academy.time });
+      }
+    }
+    return [...out.entries()]
+      .filter(([key]) => !skipped.includes(key))
+      .map(([, booking]) => booking)
+      .sort((x, y) => `${x.date}${x.startTime}`.localeCompare(`${y.date}${y.startTime}`));
+  }, [picks, repeatUntil, skipped, viewerTz, orgTz]);
+  const planPreview = useQuery(
+    api.lessonPlan.previewLessonPlan,
+    adding && studentId && planBookings.length
+      ? { studentId, teacherId: admin ? teacherId : undefined, bookings: planBookings }
+      : "skip",
+  );
+  const planOk = planPreview?.items.filter((item) => item.ok) ?? [];
+  function resetPlan() {
+    setPicks([]);
+    setRepeatUntil("");
+    setSkipped([]);
+    planRequest.current = "";
+  }
+  function lessonLabel(date: string, startTime: string) {
+    const local = convertZoned(date, startTime, orgTz, viewerTz);
+    const day = new Date(`${local.date}T00:00:00Z`).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+    return `${day} · ${formatTime(local.time, clock)}`;
+  }
+  async function bookPlan() {
+    if (!planOk.length || !studentId) return;
+    planRequest.current ||= crypto.randomUUID();
     await run(async () => {
-      const result = await addLesson({
-        teacherId,
+      const result = await bookPlan_({
         studentId,
-        date: target.date,
-        startTime: target.startTime,
-        requestId,
+        teacherId: admin ? teacherId : undefined,
+        bookings: planOk.map(({ date, startTime }) => ({ date, startTime })),
+        requestId: planRequest.current,
       });
       setAdding(false);
-      setTarget(null);
       setStudentId("");
+      resetPlan();
       toast.success(
-        result.unpaid
-          ? "Lesson scheduled · payment needs admin follow-up"
-          : "Lesson scheduled",
+        `Booked ${result.booked} lesson${result.booked === 1 ? "" : "s"}` +
+          (result.unpaid ? ` · ${result.unpaid} need payment follow-up` : ""),
       );
     });
   }
@@ -360,9 +412,10 @@ export function StaffCalendar({
                 setAdding(true);
                 setMoving(null);
                 setTarget(null);
+                resetPlan();
               }}
             >
-              Add lesson
+              Book lessons
             </Button>
           )}
           <Button variant="outline" onClick={() => setTools((value) => !value)}>
@@ -414,7 +467,7 @@ export function StaffCalendar({
       )}
       {(moving || adding) && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
-          <strong>{moving ? "Choose the new time" : "Add lesson"}</strong>
+          <strong>{moving ? "Choose the new time" : "Book lessons"}</strong>
           {adding && (
             <select
               aria-label="Student"
@@ -423,6 +476,7 @@ export function StaffCalendar({
               onChange={(e) => {
                 setStudentId(e.target.value);
                 setTarget(null);
+                resetPlan();
               }}
             >
               <option value="">Choose student</option>
@@ -436,7 +490,9 @@ export function StaffCalendar({
           <span className="text-sm">
             {adding && !studentId
               ? "Choose a student first."
-              : "Select two free half-hour cells. Published availability is optional."}
+              : adding
+                ? "Tap each weekly lesson time (e.g. Mon 18:00 and Wed 18:00), then repeat it below."
+                : "Select two free half-hour cells. Published availability is optional."}
           </span>
           <Button
             variant="ghost"
@@ -444,10 +500,114 @@ export function StaffCalendar({
               setMoving(null);
               setAdding(false);
               setTarget(null);
+              resetPlan();
             }}
           >
             Exit
           </Button>
+        </div>
+      )}
+      {adding && studentId && picks.length > 0 && (
+        <div className="space-y-3 rounded-xl border bg-background p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium">Weekly times:</span>
+            {[...picks]
+              .sort((x, y) => `${x.viewerDate}${x.viewerStartTime}`.localeCompare(`${y.viewerDate}${y.viewerStartTime}`))
+              .map((pick) => (
+                <button
+                  key={`${pick.date}|${pick.startTime}`}
+                  type="button"
+                  className="rounded-full border px-2 py-0.5 text-sm"
+                  onClick={() => {
+                    setPicks((current) => current.filter((c) => c !== pick));
+                    setSkipped([]);
+                    planRequest.current = "";
+                  }}
+                  aria-label={`Remove ${lessonLabel(pick.date, pick.startTime)}`}
+                >
+                  {lessonLabel(pick.date, pick.startTime)} ×
+                </button>
+              ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={!!repeatUntil}
+                onChange={(e) => {
+                  const first = [...picks].sort((x, y) => x.viewerDate.localeCompare(y.viewerDate))[0];
+                  setRepeatUntil(
+                    e.target.checked
+                      ? new Date(Date.parse(`${first.viewerDate}T00:00:00Z`) + 27 * 86400000).toISOString().slice(0, 10)
+                      : "",
+                  );
+                  setSkipped([]);
+                  planRequest.current = "";
+                }}
+              />
+              Repeat every week
+            </label>
+            {repeatUntil && (
+              <label className="flex items-center gap-2 text-sm">
+                until
+                <Input
+                  type="date"
+                  className="w-auto"
+                  value={repeatUntil}
+                  min={[...picks].sort((x, y) => x.viewerDate.localeCompare(y.viewerDate))[0]?.viewerDate}
+                  onChange={(e) => {
+                    setRepeatUntil(e.target.value);
+                    setSkipped([]);
+                    planRequest.current = "";
+                  }}
+                />
+              </label>
+            )}
+          </div>
+          {planPreview === undefined ? (
+            <p className="text-sm text-muted-foreground">Checking the plan…</p>
+          ) : (
+            <>
+              <p className="text-sm">
+                <strong>{planOk.length}</strong> lesson{planOk.length === 1 ? "" : "s"} ·{" "}
+                {planOk.filter((item) => item.paid).length} paid from balance ({planPreview.balance} available)
+                {planOk.some((item) => !item.paid) && (
+                  <span className="text-amber-700 dark:text-amber-300">
+                    {" "}· {planOk.filter((item) => !item.paid).length} need payment follow-up
+                  </span>
+                )}
+              </p>
+              <ul className="max-h-56 space-y-1 overflow-auto text-sm">
+                {planPreview.items.map((item) => (
+                  <li key={`${item.date}|${item.startTime}`} className="flex flex-wrap items-center gap-2">
+                    <span className={item.ok ? "" : "text-muted-foreground line-through"}>
+                      {lessonLabel(item.date, item.startTime)}
+                    </span>
+                    {!item.ok && <span className="text-destructive">{item.reason}</span>}
+                    {item.ok && !item.paid && <span className="text-xs text-amber-700 dark:text-amber-300">unpaid</span>}
+                    {item.ok && (
+                      <button
+                        type="button"
+                        className="text-xs underline"
+                        onClick={() => {
+                          setSkipped((values) => [...values, `${item.date}|${item.startTime}`]);
+                          planRequest.current = "";
+                        }}
+                      >
+                        Skip
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {planPreview.items.some((item) => !item.ok) && (
+                <p className="text-xs text-muted-foreground">Crossed-out times don&apos;t fit and won&apos;t be booked.</p>
+              )}
+              <Button disabled={saving || planOk.length === 0} onClick={() => void bookPlan()}>
+                {saving ? "Booking…" : `Book ${planOk.length} lesson${planOk.length === 1 ? "" : "s"}`}
+              </Button>
+            </>
+          )}
         </div>
       )}
       {!admin &&
@@ -553,7 +713,8 @@ export function StaffCalendar({
             : undefined
         }
         moveMode={!!moving || (adding && !!studentId)}
-        proposed={target ?? undefined}
+        proposed={moving ? (target ?? undefined) : undefined}
+        selected={adding ? picks.map(({ date, startTime }) => ({ date, startTime })) : []}
         disabled={actionSaving || refreshing || ((adding || !!moving) && saving) || (adding && !studentId)}
       />
       <Dialog open={!!event} onOpenChange={(value) => !value && setEvent(null)}>
@@ -738,7 +899,7 @@ export function StaffCalendar({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {moving ? "Move lesson" : "Confirm lesson"}
+              Move lesson
             </DialogTitle>
           </DialogHeader>
           {target && (
@@ -753,28 +914,19 @@ export function StaffCalendar({
                   {movePreview?.reason ?? "Checking this time…"}
                 </p>
               )}
-              {adding && (
-                <p className="text-sm">
-                  {students.find((s) => s.externalId === studentId)?.name} ·{" "}
-                  {cellData.studentBalance < (cellData.lessonCost ?? 1)
-                    ? "No lesson credit available. This booking will need payment follow-up."
-                    : "Uses one lesson credit."}
-                </p>
-              )}
               <Button
                 disabled={saving || (!!moving && !movePreview?.allowed)}
                 onClick={() =>
-                  moving
-                    ? void run(async () => {
-                        await reschedule({
-                          eventId: moving._id as Id<"scheduleEvents">,
-                          toDate: target.date,
-                          toStartTime: target.startTime,
-                        });
-                        setMoving(null);
-                        setTarget(null);
-                      }, "Lesson moved")
-                    : void saveLesson()
+                  moving &&
+                  void run(async () => {
+                    await reschedule({
+                      eventId: moving._id as Id<"scheduleEvents">,
+                      toDate: target.date,
+                      toStartTime: target.startTime,
+                    });
+                    setMoving(null);
+                    setTarget(null);
+                  }, "Lesson moved")
                 }
               >
                 {saving ? "Saving…" : "Confirm"}

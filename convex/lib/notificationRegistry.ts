@@ -110,6 +110,11 @@ function fmtDate(date?: string): string {
   return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 
+/** A booked plan sends one notification carrying how many lessons it holds. */
+function lessonCount(payload: Payload): number {
+  return typeof payload.count === "number" ? payload.count : 1;
+}
+
 function at(payload: Payload, dateKey = "date", timeKey = "startTime"): string {
   const date = fmtDate(s(payload, dateKey));
   const time = s(payload, timeKey);
@@ -268,18 +273,18 @@ export const NOTIFICATION_CONTRACTS: Record<NotificationKind, NotifContract> = {
     audiences: ["student", "teacher", "admin"],
     icon: "calendar",
     tone: "success",
-    title: (p) => (lessonRefs(p).length > 1 ? `${lessonRefs(p).length} lessons booked` : "Lesson booked"),
+    title: (p) => {
+      const n = Math.max(lessonRefs(p).length, lessonCount(p));
+      return n > 1 ? `${n} lessons booked` : "Lesson booked";
+    },
     body: (p) => {
-      const lessons = lessonRefs(p);
       if (p.by === "weekly-schedule") return `Your weekly slot booked ${at(p)}.`;
-      if (p.by === "student" && s(p, "studentName")) {
-        return lessons.length > 1
-          ? `${s(p, "studentName")} booked ${lessons.length} lessons: ${lessonList(lessons)}.`
-          : `${s(p, "studentName")} booked a lesson ${at(lessons[0] ?? p)}.`;
-      }
-      return lessons.length > 1
-        ? `${actor(s(p, "by"))} booked ${lessons.length} lessons: ${lessonList(lessons)}.`
-        : `${actor(s(p, "by"))} booked a lesson ${at(p)}.`;
+      const lessons = lessonRefs(p);
+      const who = p.by === "student" && s(p, "studentName") ? s(p, "studentName")! : actor(s(p, "by"));
+      // Student batch bookings list every lesson; staff lesson plans send a count.
+      if (lessons.length > 1) return `${who} booked ${lessons.length} lessons: ${lessonList(lessons)}.`;
+      if (lessonCount(p) > 1) return `${who} booked ${lessonCount(p)} lessons, starting ${at(p)}.`;
+      return `${who} booked a lesson ${at(lessons[0] ?? p)}.`;
     },
     destination: (_p, role) =>
       role === "admin" ? "/admin/calendar" : role === "teacher" ? "/teacher/calendar" : "/student/calendar",
@@ -1064,7 +1069,7 @@ export function notificationViewForLocale(
         session_reminder: `${name || "Ваш урок"} — ${at(p)}.`,
         homework_assigned: `${name || "Домашнее задание"} назначено вам.`,
         homework_reviewed: `Ваш преподаватель проверил: ${name || "домашнее задание"}.`,
-        lesson_assigned: `Ваш урок запланирован: ${at(p)}.`,
+        lesson_assigned: lessonCount(p) > 1 ? `Запланировано уроков: ${lessonCount(p)}, первый — ${at(p)}.` : `Ваш урок запланирован: ${at(p)}.`,
         lesson_cancelled: `Урок отменён: ${at(p)}.`,
         lesson_rescheduled: `Новый срок урока: ${at(p, "toDate", "toTime")}.`,
         teacher_late_start: `${s(p, "teacherName") || "Преподаватель"} ещё не начал урок «${s(p, "title") || "урок"}» — начало задерживается.`,
@@ -1082,7 +1087,7 @@ export function notificationViewForLocale(
           session_reminder: `${name || "درسك"} — ${at(p)}.`,
           homework_assigned: `تم تعيين ${name || "الواجب المنزلي"} لك.`,
           homework_reviewed: `راجع المدرس ${name || "واجبك المنزلي"}.`,
-          lesson_assigned: `تم تحديد موعد درسك: ${at(p)}.`,
+          lesson_assigned: lessonCount(p) > 1 ? `تم تحديد ${lessonCount(p)} دروس، أولها ${at(p)}.` : `تم تحديد موعد درسك: ${at(p)}.`,
           lesson_cancelled: `تم إلغاء الدرس: ${at(p)}.`,
           lesson_rescheduled: `موعد الدرس الجديد: ${at(p, "toDate", "toTime")}.`,
           meeting_room_changed: "غيّر مدرسك غرفة الاجتماع. اضغط على الانضمام للدرس لفتح الغرفة الحالية.",
@@ -1100,7 +1105,7 @@ export function notificationViewForLocale(
           session_reminder: `${name || "Сабағыңыз"} — ${at(p)}.`,
           homework_assigned: `${name || "Үй тапсырмасы"} сізге тағайындалды.`,
           homework_reviewed: `Мұғалім ${name || "үй тапсырмаңызды"} тексерді.`,
-          lesson_assigned: `Сабағыңыз жоспарланды: ${at(p)}.`,
+          lesson_assigned: lessonCount(p) > 1 ? `${lessonCount(p)} сабақ жоспарланды, біріншісі — ${at(p)}.` : `Сабағыңыз жоспарланды: ${at(p)}.`,
           lesson_cancelled: `Сабақ тоқтатылды: ${at(p)}.`,
           lesson_rescheduled: `Сабақтың жаңа уақыты: ${at(p, "toDate", "toTime")}.`,
           meeting_room_changed: "Мұғалім кездесу бөлмесін өзгертті. Ағымдағы бөлмені ашу үшін сабаққа қосылуды басыңыз.",
