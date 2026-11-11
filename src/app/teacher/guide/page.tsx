@@ -52,7 +52,18 @@ function Grid({ children }: { children: ReactNode }) {
   return <div className="grid gap-4 sm:grid-cols-2">{children}</div>;
 }
 
-/** The shape of a lesson: five stages down a coloured rail. */
+type Stage = { from: number; to: number; icon: typeof Coffee; title: string; what: string; tool: string; color: string };
+
+/** A course-book lesson (e.g. English File) — the book lives in the Library / Google Drive. */
+const BOOK_ARC: Stage[] = [
+  { from: 0, to: 5, icon: Coffee, title: "Warm up", what: "A few minutes of chat, then into the book.", tool: "—", color: "#f4b400" },
+  { from: 5, to: 10, icon: ListChecks, title: "Check homework", what: "Go over last time's mistakes before new material.", tool: "Lesson → Homework", color: "#10b981" },
+  { from: 10, to: 40, icon: BookOpen, title: "Work through the unit", what: "Open the book page from the Library (Google Drive) and share it in Meet. Do the grammar, vocabulary and listening exercises together.", tool: "Library → book", color: "#7c3aed" },
+  { from: 40, to: 50, icon: MessagesSquare, title: "Speak on the unit topic", what: "Use the unit's speaking task, or generate questions from what was said.", tool: "Questions tab", color: "#0ea5e9" },
+  { from: 50, to: 55, icon: Send, title: "Wrap up", what: "Name the page you reached and one thing to practise. Homework = the matching workbook exercise (see Homework below).", tool: "Notes tab", color: "#f43f5e" },
+];
+
+/** A speaking lesson: less structure, more talk. */
 const ARC: { from: number; to: number; icon: typeof Coffee; title: string; what: string; tool: string; color: string }[] = [
   { from: 0, to: 5, icon: Coffee, title: "Warm up", what: "Chat about their week. Bring back two or three words from last time and get them to use them.", tool: "Students → their words", color: "#f4b400" },
   { from: 5, to: 20, icon: BookOpen, title: "Read together", what: "Present a short text. They read aloud; you stop on words they don't know and add them to their list.", tool: "Present → Reading", color: "#7c3aed" },
@@ -61,11 +72,12 @@ const ARC: { from: number; to: number; icon: typeof Coffee; title: string; what:
   { from: 50, to: 55, icon: Send, title: "Wrap up", what: "Repeat today's key words, name one thing to work on, tell them the notes and homework arrive after you publish.", tool: "Notes tab", color: "#f43f5e" },
 ];
 
-function LessonArc() {
+function LessonArc({ title, stages }: { title: string; stages: Stage[] }) {
+  const ARC = stages;
   return (
     <div className="rounded-2xl border border-[#26143f]/10 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex items-baseline justify-between gap-3">
-        <h3 className="text-lg font-extrabold text-[#26143f]">A lesson, start to finish</h3>
+        <h3 className="text-lg font-extrabold text-[#26143f]">{title}</h3>
         <span className="text-xs font-bold text-[#645b70]">55 min teaching</span>
       </div>
       <div className="mt-3 flex h-3 overflow-hidden rounded-full" aria-hidden>
@@ -88,7 +100,6 @@ function LessonArc() {
           </li>
         ))}
       </ol>
-      <p className="mt-3 text-sm text-[#645b70]">A shape, not a script — follow the student. Skip reading on a talk-heavy day; spend longer on checking before an exam.</p>
     </div>
   );
 }
@@ -154,9 +165,13 @@ export default function TeacherGuidePage() {
       <Section
         id="approach"
         title="How we teach"
-        intro="One-to-one lessons are expensive for the student, so every minute should be theirs: they speak, they read, they leave with words they'll see again."
+        intro="There are two kinds of lesson. Book lessons follow the course book (e.g. English File) — it's in the Library, stored in Google Drive. Speaking lessons have less book and more conversation. Either way, every minute should be the student's."
       >
-        <LessonArc />
+        <Grid>
+          <LessonArc title="Book lesson (English File)" stages={BOOK_ARC} />
+          <LessonArc title="Speaking lesson" stages={ARC} />
+        </Grid>
+        <p className="mt-3 text-sm text-[#645b70]">A shape, not a script — follow the student and their goal.</p>
         <div className="mt-4"><Grid>
           <InfoCard icon={MessagesSquare} title="The student talks most" lines={[
             "Aim for them speaking more than you. Ask open questions — “why?”, “tell me about…”.",
@@ -288,6 +303,17 @@ export default function TeacherGuidePage() {
           <InfoCard icon={PenLine} title="Build a worksheet" lines={[
             <>Choose an exercise type and <b>Write myself</b>: gaps, choices, matching, word order, rewrites, corrections, dialogues, reading, short answers or guided writing.</>,
             "Select text in a gap sentence to turn it into a blank. Paste many questions with the bulk tool.",
+          ]} />
+          <InfoCard icon={ClipboardCheck} tone="good" title="Paste a workbook exercise" lines={[
+            <>Lesson → <b>Homework</b> → <b>Convert workbook text</b>.</>,
+            "Open the workbook page in the Library (Google Drive), copy the instructions, passage and questions — and the answer key if you have it — and paste them (up to 12,000 characters).",
+            "PDF pages, pictures and audio aren't imported: copy the text. Missing pictures or audio show up as source notes in the preview.",
+            <><b>Convert this exercise</b> keeps it as written; <b>Create similar practice</b> makes new questions on the same point. Press <b>Generate preview</b>, fix anything, insert it.</>,
+          ]} />
+          <InfoCard icon={ListChecks} title="Paste several questions at once" lines={[
+            <>In a section, open <b>Paste several questions</b>.</>,
+            <>One line per question: <code>question | correct answer | other choice | other choice</code>.</>,
+            "For word-order exercises, paste one complete sentence per line. Open questions can have no answer.",
           ]} />
           <InfoCard icon={Sparkles} title="Use AI when it helps" lines={[
             <><b>Generate with AI</b> makes one exercise type; <b>Generate a worksheet</b> mixes types. Set level, objective, count and optional words.</>,
