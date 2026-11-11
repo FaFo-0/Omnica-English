@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useLocale } from "next-intl";
 import type { CSSProperties } from "react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
@@ -19,8 +18,7 @@ export function PortalPolicyPage({ audience }: { audience: "student" | "all" }) 
     <div style={{ maxWidth: 820, "--policy-accent": "var(--omnic-tenant-primary)" } as CSSProperties}>
       <h1 className="h1" style={{ margin: "0 0 6px" }}>{c.title}</h1>
       <p className="body-sm" style={{ marginBottom: 18 }}>
-        {c.intro}{" "}
-        <Link className="link" href={`/policy?lang=${locale}`} target="_blank">/policy</Link>
+        {c.intro}
       </p>
       {policy === undefined ? (
         <div className="body">{c.loading}</div>

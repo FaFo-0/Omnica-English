@@ -2,6 +2,8 @@
 
 > Single source of truth for **business policy**. `MASTER_PLAN.md` says how the software is built; this file says how the academy runs. Backend enforcement lives in `convex/lib/policy.ts` and must mirror this file — when they disagree, this file wins and the code is a bug.
 >
+> **Numbers are admin-settable (2026-11-11).** The figures below are the defaults. The admin can change any rule number in Settings → Policy; the live values are on the public `/policy` page. This file owns the *shape* of each rule; Settings owns its number.
+>
 > Status tags: **[DECIDED]** locked by FaFo · **[PROPOSED]** recommendation awaiting FaFo · **[OPEN]** needs a decision or research.
 >
 > Created 2026-07-19 after the pricing/retention brainstorm. Supersedes the EnglishDom-derived retention design in MASTER_PLAN §13.6–13.7 where they conflict.
@@ -244,3 +246,5 @@
 | 2026-10-08 | [Codex] FaFo approved the Standard 20% launch prices, 1,500 KZT normal paid trial, platform/flashcard benefits and deferred IELTS. Updated existing catalogue rows without changing historical orders, grants or payroll rates. |
 
 | 2026-10-09 | [Codex] FaFo selected 8/12/24 packs, extended the 24-pack to 90 days from first use and delegated prices below the competitor with a launch discount. Set the current catalogue amounts in §1; teacher pay agreements remain independent. |
+
+| 2026-11-11 | [Claude] FaFo decided every proposed/open platform rule (§2 expiry warnings, §4 per-teacher rates, monthly payout, 10h weekly minimum flagged-only, §7 attention list, §8 consent, §10 homework obligations, §11 conduct with the academy administration as referee). Rule numbers became admin-settable. Company/tax items in §9 and §13 remain open. |

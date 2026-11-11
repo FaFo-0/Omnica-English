@@ -79,7 +79,7 @@ const times = {
   ru: (n: number) => ru(n, "раз", "раза", "раз"),
   en: (n: number) => (n === 1 ? "once" : n === 2 ? "twice" : `${n} times`),
   kk: (n: number) => `${n} рет`,
-  ar: (n: number) => `${n} ${n === 1 ? "مرة" : n === 2 ? "مرتان" : "مرات"}`,
+  ar: (n: number) => (n === 1 ? "مرة واحدة" : n === 2 ? "مرتين" : n <= 10 ? `${n} مرات` : `${n} مرة`),
 };
 
 function bookingWindow(locale: PolicyLocale, months: number): string {

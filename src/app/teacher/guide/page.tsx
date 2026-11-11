@@ -266,7 +266,7 @@ export default function TeacherGuidePage() {
           You can change lessons in the next {n(policy?.actionHorizonDays, "days")}.
           The student <strong>always gets the lesson back</strong> — your
           cancellation never costs them. With less than{" "}
-          {n(policy?.teacherCancelNoticeHours, "hours")} notice it is still
+          {n(policy?.teacherCancelNoticeHours, "hours")}&apos; notice it is still
           allowed but counts against your reliability, and you can&apos;t cancel
           a first lesson with a new student. Agree a new time with the student
           before you move it.
