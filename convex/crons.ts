@@ -53,4 +53,8 @@ crons.cron(
 
 crons.interval("resume vocabulary preparation", { minutes: 15 }, internal.libraryPreparation.resumeQueue, {});
 
+// Daily nudges (teacher agenda, study reminder, homework due, out of
+// lessons). Hourly so each lands at the right hour in the recipient's zone.
+crons.interval("notification digests", { hours: 1 }, internal.notificationDigests.hourly, {});
+
 export default crons;

@@ -17,6 +17,8 @@ const SIGNAL_LABELS: Record<string, string> = {
   neverBooked: "Never booked",
   expiring: "Credits expiring",
   unpaid: "Unpaid lesson",
+  lateMaterials: "Materials not published",
+  lowAvailability: "Low teacher availability",
 };
 
 export default function AdminAttentionPage() {
@@ -102,9 +104,48 @@ export default function AdminAttentionPage() {
       </Section>
 
       <Section
+        id="lateMaterials"
+        title="Lesson materials not published"
+        note={`Teachers publish a lesson's summary, words and quiz within ${attention.lessonPublishHours} h. Overdue ones count against the teacher's reliability.`}
+        rows={attention.lateMaterials}
+        empty={attention.lateMaterials.length === 0}
+      >
+        {attention.lateMaterials.map((l) => (
+          <RowItem
+            key={l.lessonId}
+            href={`/teacher/sessions/${l.lessonId}`}
+            action="Open lesson"
+            onDismiss={() => handleDismiss("lateMaterials", l.lessonId)}
+          >
+            <strong>{l.teacherName ?? "Teacher"}</strong> — {l.title}
+            {l.studentName ? ` with ${l.studentName}` : ""} · {l.hoursOverdue} h overdue
+          </RowItem>
+        ))}
+      </Section>
+
+      <Section
+        id="lowAvailability"
+        title="Teachers below the weekly minimum"
+        note={`Teachers keep at least ${attention.teacherMinWeeklyHours} open hours in their usual week. This is a reminder to talk — nothing is hidden or blocked.`}
+        rows={attention.lowAvailability}
+        empty={attention.lowAvailability.length === 0}
+      >
+        {attention.lowAvailability.map((t) => (
+          <RowItem
+            key={t.teacherId}
+            href={`/admin/teachers/${t.teacherId}`}
+            action="Open teacher"
+            onDismiss={() => handleDismiss("lowAvailability", t.teacherId)}
+          >
+            <strong>{t.teacherName}</strong> — {t.weeklyHours} h open per week
+          </RowItem>
+        ))}
+      </Section>
+
+      <Section
         id="expiring"
         title="Credits expiring"
-        note="Lessons lapse 60 days after first use (POLICY §2)."
+        note="Lesson packs lapse a set number of days after first use."
         rows={attention.expiringSoon}
         empty={attention.expiringSoon.length === 0}
       >

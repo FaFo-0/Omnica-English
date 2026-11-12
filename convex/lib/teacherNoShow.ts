@@ -1,8 +1,9 @@
 import { syncLessonTitles } from "./syncLessonTitles";
 import type { MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
-import { insertNotification } from "../notifications";
+import { insertNotification, notifyBestEffort } from "../notifications";
 import { refundPointsForEventInternal } from "../points";
+import { loadPolicy } from "./policySettings";
 import {
   teacherGenuineNoShowSourceKey,
   teacherLateStartSourceKey,
@@ -149,7 +150,8 @@ export async function transitionNoShowForEvent(
     // from the stored academy wall-clock event and tenant timezone here, so
     // manual/admin and automatic producers share the same server-side instant.
     const startMs = await eventStartMs(ctx, args.organizationId, event);
-    assertTeacherNoShowDue(transitionNowMs, startMs);
+    const { noShowWaitMinutes } = await loadPolicy(ctx, args.organizationId);
+    assertTeacherNoShowDue(transitionNowMs, startMs, noShowWaitMinutes);
   }
 
   const desiredStatus = args.party === "teacher" ? "no_show_teacher" : "no_show_student";
@@ -225,6 +227,25 @@ export async function transitionNoShowForEvent(
         sourceKey: teacherGenuineNoShowSourceKey(event._id, admin.externalId),
       });
     }
+  }
+
+  if (args.party === "student" && event.studentId) {
+    // The booked credit stays spent (POLICY: student no-show is charged);
+    // tell the student so a missed lesson is never a silent deduction.
+    await notifyBestEffort(ctx, {
+      organizationId: args.organizationId,
+      recipientId: event.studentId,
+      kind: "student_no_show",
+      payload: {
+        eventId: event._id,
+        title: event.title,
+        date: event.date,
+        startTime: event.startTime,
+        charged: (event.pointCostSnapshot ?? 0) > 0 && !event.unpaid,
+      },
+      link: "/student/calendar",
+      sourceKey: `student-no-show:${event._id}`,
+    });
   }
 
   await ctx.db.patch(event._id, {

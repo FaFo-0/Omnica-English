@@ -484,7 +484,8 @@ export default function StudentCalendarPage() {
                   <p className="text-sm text-muted-foreground">
                     {cancelConfirm
                       ? policyText(action.cancel)
-                      : policyText(action.reschedule)}
+                      : policyText(action.reschedule)}{" "}
+                    <Link href="/student/policy" className="underline underline-offset-2">{t("seeRules")}</Link>
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <Button

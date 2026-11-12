@@ -60,6 +60,8 @@ export function StaffCalendar({
 }) {
   const availabilityText = useTranslations("components.calendar.availabilityActions");
   const me = useQuery(api.users.getMe);
+  const livePolicy = useQuery(api.policyConstants.get, {});
+  const rulesHref = me?.role === "teacher" ? "/teacher/guide#rules" : "/admin/settings#policy";
   const [viewerTz, setViewerTz] = useViewerTz(me?.timezone);
   const [clock, setClock] = useTimeFormat(me?.timeFormat);
   const [selectedDate, setDate] = useState<Date | null>(() => initialDate ?? null);
@@ -197,9 +199,9 @@ export function StaffCalendar({
   }, [availabilityEdits]);
   useEffect(() => {
     if (lastGesture.some((cell) => cell.open && cell.withinBookingNotice)) {
-      toast.info(availabilityText("nearTermOpened"));
+      toast.info(availabilityText("nearTermOpened", { hours: livePolicy?.bookingMinNoticeHours ?? 12 }));
     }
-  }, [lastGesture, availabilityText]);
+  }, [lastGesture, availabilityText, livePolicy?.bookingMinNoticeHours]);
   useEffect(() => {
     if (freshCells) availabilityEdits.observe(freshCells.cells);
   }, [freshCells, availabilityEdits]);
@@ -235,8 +237,13 @@ export function StaffCalendar({
     [repeat, setRepeat] = useState(false);
   const [from, setFrom] = useState(""),
     [until, setUntil] = useState("");
+  const bookedOff = useQuery(
+    api.calendar.bookedInRange,
+    off && from && until ? { fromDate: from, toDate: until, teacherId } : "skip",
+  );
   const [title, setTitle] = useState("");
-  const [cancelConfirm, setCancelConfirm] = useState(false);
+  // null → idle; "choose" → picking who the cancellation is for; else picked.
+  const [cancelChoice, setCancelChoice] = useState<null | "choose" | "teacher" | "student" | "academy">(null);
   const canEdit =
     !!me &&
     userHasPermission(me, admin ? "scheduling.edit" : "calendar.edit.full");
@@ -685,7 +692,7 @@ export function StaffCalendar({
         onEventClick={(ev) => {
           setEvent(ev);
           setTitle(ev.title);
-          setCancelConfirm(false);
+          setCancelChoice(null);
         }}
         canDragEvent={(ev) => {
           const row = cal.events.find((e) => e._id === ev._id);
@@ -792,40 +799,99 @@ export function StaffCalendar({
               )}
               {preview && (
                 <>
-                  <p className="text-sm text-muted-foreground">
-                    {cancelConfirm
-                      ? preview.cancel.reason
-                      : preview.reschedule.reason}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      disabled={!preview.reschedule.allowed || saving}
-                      onClick={() => {
-                        setMoving(event);
-                        setEvent(null);
-                        setAdding(false);
-                        setTarget(null);
-                      }}
-                    >
-                      Move lesson
-                    </Button>
-                    <Button
-                      variant="outline"
-                      disabled={!preview.cancel.allowed || saving}
-                      onClick={() =>
-                        cancelConfirm
-                          ? void run(async () => {
+                  {cancelChoice === null && (
+                    <p className="text-sm text-muted-foreground">
+                      {preview.reschedule.reason}{" "}
+                      <Link href={rulesHref} className="underline underline-offset-2">Rules</Link>
+                    </p>
+                  )}
+                  {cancelChoice === null ? (
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        disabled={!preview.reschedule.allowed || saving}
+                        onClick={() => {
+                          setMoving(event);
+                          setEvent(null);
+                          setAdding(false);
+                          setTarget(null);
+                        }}
+                      >
+                        Move lesson
+                      </Button>
+                      <Button
+                        variant="outline"
+                        disabled={(!preview.cancel.allowed && !preview.cancelForStudent?.allowed) || saving}
+                        onClick={() => setCancelChoice("choose")}
+                      >
+                        Cancel lesson
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">
+                        Why is this lesson cancelled?{" "}
+                        <Link href={rulesHref} className="text-xs font-normal underline underline-offset-2">Rules</Link>
+                      </p>
+                      {(admin
+                        ? ([
+                            ["student", "Student asked to cancel", preview.cancelForStudent],
+                            ["teacher", "Teacher can't make it", preview.cancel],
+                            ["academy", "Academy decision", preview.cancel],
+                          ] as const)
+                        : ([
+                            ["teacher", "I can't teach it", preview.cancel],
+                            ["student", "Student asked to cancel", preview.cancelForStudent],
+                          ] as const)
+                      ).map(([value, label, verdict]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          disabled={!verdict?.allowed || saving}
+                          onClick={() => setCancelChoice(value)}
+                          className="w-full rounded-md border px-3 py-2 text-start disabled:opacity-50"
+                          style={{
+                            borderColor: cancelChoice === value ? "var(--brand-purple, #6716A4)" : undefined,
+                            background: cancelChoice === value ? "rgba(103,22,164,0.06)" : undefined,
+                          }}
+                        >
+                          <span className="block text-sm font-medium">{label}</span>
+                          <span className="block text-xs text-muted-foreground">
+                            {value === "teacher" && verdict?.allowed
+                              ? admin
+                                ? "Lesson credited back; counts as the teacher's cancellation. The student is told the teacher can't make it."
+                                : `${verdict.reason}. The student is told you can't make it.`
+                              : value === "student" && verdict?.allowed
+                                ? `${verdict.reason}. The student is told it was cancelled at their request.`
+                                : value === "academy" && verdict?.allowed
+                                  ? "Lesson credited back. Nobody's cancellation record changes."
+                                  : verdict?.reason}
+                          </span>
+                        </button>
+                      ))}
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="destructive"
+                          disabled={cancelChoice === "choose" || saving}
+                          onClick={() =>
+                            cancelChoice !== "choose" &&
+                            void run(async () => {
                               await cancel({
                                 eventId: event._id as Id<"scheduleEvents">,
+                                cancelFor: cancelChoice ?? undefined,
                               });
                               setEvent(null);
-                            }, "Lesson cancelled")
-                          : setCancelConfirm(true)
-                      }
-                    >
-                      {cancelConfirm ? "Confirm cancellation" : "Cancel lesson"}
-                    </Button>
-                  </div>
+                              setCancelChoice(null);
+                            }, "Lesson cancelled — the student has been told")
+                          }
+                        >
+                          Confirm cancellation
+                        </Button>
+                        <Button variant="outline" disabled={saving} onClick={() => setCancelChoice(null)}>
+                          Back
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </>
@@ -881,8 +947,7 @@ export function StaffCalendar({
             <DialogTitle>Time off</DialogTitle>
           </DialogHeader>
           <p className="text-sm">
-            Move or cancel lessons first. Removing time off restores your custom
-            slots.
+            Removing time off later restores your custom slots.
           </p>
           <label>
             From
@@ -900,16 +965,53 @@ export function StaffCalendar({
               onChange={(e) => setUntil(e.target.value)}
             />
           </label>
+          {bookedOff && bookedOff.length > 0 && (
+            <div className="space-y-1 rounded-md border p-3 text-sm">
+              <p className="font-medium">
+                {bookedOff.length} lesson{bookedOff.length === 1 ? " is" : "s are"} booked in these dates
+              </p>
+              <ul className="space-y-0.5">
+                {bookedOff.map((row) => (
+                  <li key={row._id} className={row.canCancel ? "" : "text-destructive"}>
+                    {row.date} · {formatTime(row.startTime, clock)} · {row.studentName}
+                    {!row.canCancel && row.reason ? ` — ${row.reason}` : ""}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-muted-foreground">
+                {bookedOff.every((row) => row.canCancel)
+                  ? "They'll be cancelled as yours: each student gets their lessons back and one message saying you can't make it."
+                  : "Move the lessons marked in red first, or ask the academy to cancel them."}
+              </p>
+            </div>
+          )}
           <Button
-            disabled={saving || !from || !until}
+            disabled={
+              saving ||
+              !from ||
+              !until ||
+              bookedOff === undefined ||
+              (bookedOff.length > 0 && !bookedOff.every((row) => row.canCancel))
+            }
             onClick={() =>
               void run(async () => {
-                await timeOff({ teacherId, fromDate: from, toDate: until });
+                const result = await timeOff({
+                  teacherId,
+                  fromDate: from,
+                  toDate: until,
+                  cancelBookedLessons: (bookedOff?.length ?? 0) > 0,
+                });
                 setOff(false);
+                if (result.affectedLessons > 0)
+                  toast.success(
+                    `${result.affectedLessons} lesson${result.affectedLessons === 1 ? "" : "s"} cancelled — students have been told`,
+                  );
               }, "Time off saved")
             }
           >
-            Block these dates
+            {bookedOff && bookedOff.length > 0
+              ? `Cancel ${bookedOff.length} lesson${bookedOff.length === 1 ? "" : "s"} and block these dates`
+              : "Block these dates"}
           </Button>
           {[...offGroups.entries()].map(([id, group]) => (
             <div

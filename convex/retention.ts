@@ -3,12 +3,12 @@
 // signals that need a human decision. It NEVER transitions a student.
 
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type QueryCtx } from "./_generated/server";
 import { requireTenantPermission } from "./lib/tenant";
 import type { Id } from "./_generated/dataModel";
+import { loadPolicy } from "./lib/policySettings";
 
 const DORMANT_DAYS = 14; // no completed lesson in this many days → surface
-const EXPIRY_WARN_DAYS = 14; // credits lapsing within this window → surface
 // A student who signed up and hasn't booked yet is a different problem from
 // one who went quiet — and on day one it isn't a problem at all. Give them a
 // week before the trial-unused nudge appears.
@@ -23,13 +23,38 @@ function daysBetween(fromIso: string, to: Date): number {
   return Math.floor((to.getTime() - from) / 86_400_000);
 }
 
+/** Hours open in a teacher's usual weekly schedule (active weekly ranges). */
+export async function usualWeeklyOpenHours(
+  ctx: QueryCtx,
+  orgId: string,
+  teacherId: string,
+  today: string
+): Promise<number> {
+  const rows = await ctx.db
+    .query("teacherVacancies")
+    .withIndex("by_organization_and_teacherId", (q) =>
+      q.eq("organizationId", orgId).eq("teacherId", teacherId)
+    )
+    .collect();
+  const minutes = (time: string) => {
+    const [h, m] = time.split(":").map(Number);
+    return h * 60 + m;
+  };
+  const total = rows
+    .filter((r) => r.isActive && r.validFrom <= today && (!r.validUntil || r.validUntil >= today))
+    .reduce((sum, r) => sum + Math.max(0, minutes(r.endTime) - minutes(r.startTime)), 0);
+  return Math.round((total / 60) * 10) / 10;
+}
+
 export const adminAttention = query({
   args: {},
   handler: async (ctx) => {
     const { orgId } = await requireTenantPermission(ctx, "users.view.any");
+    const policy = await loadPolicy(ctx, orgId);
     const today = new Date();
     const todayStr = today.toISOString().slice(0, 10);
-    const warnCutoff = new Date(today.getTime() + EXPIRY_WARN_DAYS * 86_400_000)
+    // Credits lapsing within the first warning horizon → surface.
+    const warnCutoff = new Date(today.getTime() + policy.expiryWarnFirstDays * 86_400_000)
       .toISOString()
       .slice(0, 10);
 
@@ -197,17 +222,81 @@ export const adminAttention = query({
     }
     unpaid.sort((a, b) => a.date.localeCompare(b.date));
 
+    // POLICY §10 — lesson material the teacher hasn't published within the
+    // policy window. Only unpublished rows are read (status index).
+    const teachers = await ctx.db
+      .query("users")
+      .withIndex("by_organization_and_role", (q) =>
+        q.eq("organizationId", orgId).eq("role", "teacher")
+      )
+      .collect();
+    const teacherName = new Map(teachers.map((t) => [t.externalId, t.name]));
+    const lateMaterials: {
+      lessonId: Id<"lessons">;
+      teacherName: string | null;
+      studentName: string | null;
+      title: string;
+      hoursOverdue: number;
+    }[] = [];
+    const nowMs = today.getTime();
+    for (const status of ["transcribed", "review"] as const) {
+      const rows = await ctx.db
+        .query("lessons")
+        .withIndex("by_organization_and_status", (q) =>
+          q.eq("organizationId", orgId).eq("status", status)
+        )
+        .collect();
+      for (const l of rows) {
+        if (l.isDeleted || dismissed("lateMaterials", l._id)) continue;
+        const endedMs =
+          Date.parse(l.sessionStartedAt ?? l.createdAt) + l.durationSeconds * 1000;
+        const overdueMs = nowMs - endedMs - policy.lessonPublishHours * 3_600_000;
+        if (Number.isNaN(overdueMs) || overdueMs <= 0) continue;
+        lateMaterials.push({
+          lessonId: l._id,
+          teacherName: teacherName.get(l.teacherId) ?? null,
+          studentName: nameOf.get(l.studentId) ?? null,
+          title: l.title,
+          hoursOverdue: Math.floor(overdueMs / 3_600_000),
+        });
+      }
+    }
+    lateMaterials.sort((a, b) => b.hoursOverdue - a.hoursOverdue);
+
+    // POLICY §4 — teachers whose usual weekly schedule is below the minimum.
+    // A flag for a conversation, never an automatic hide or block.
+    const lowAvailability: {
+      teacherId: string;
+      teacherName: string;
+      weeklyHours: number;
+    }[] = [];
+    if (policy.teacherMinWeeklyHours > 0) {
+      for (const t of teachers) {
+        if (dismissed("lowAvailability", t.externalId)) continue;
+        const weeklyHours = await usualWeeklyOpenHours(ctx, orgId, t.externalId, todayStr);
+        if (weeklyHours < policy.teacherMinWeeklyHours) {
+          lowAvailability.push({ teacherId: t.externalId, teacherName: t.name, weeklyHours });
+        }
+      }
+    }
+
     return {
       dormant,
       neverBooked,
       expiringSoon,
       lowBalanceRecurring,
       unpaid,
+      lateMaterials,
+      lowAvailability,
+      teacherMinWeeklyHours: policy.teacherMinWeeklyHours,
+      lessonPublishHours: policy.lessonPublishHours,
       total:
         dormant.length +
         neverBooked.length +
         expiringSoon.length +
-        unpaid.length,
+        unpaid.length +
+        lateMaterials.length +
+        lowAvailability.length,
     };
   },
 });

@@ -9,6 +9,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { requireTenant, requireTenantPermission, ACADEMY_ID } from "./lib/tenant";
 import { DEFAULT_ROLES, PERMISSIONS } from "./lib/permissions";
+import { loadPolicy } from "./lib/policySettings";
 import { isSuperadmin } from "./lib/superadmin";
 import { assertQaIdentityAllowed } from "./lib/qaSafety";
 
@@ -613,7 +614,26 @@ export const getTeacherDetailForAdmin = query({
       teacherNoShows: live.filter((e) => e.status === "no_show_teacher").length,
       teacherCancellations: live.filter((e) => e.cancelledBy === "teacher").length,
       awaitingHomeworkReview: homework.filter((h) => h.status === "submitted").length,
+      lateMaterials: 0,
     };
+    // POLICY §10 — unpublished lesson material past the publishing window.
+    const policy = await loadPolicy(ctx, orgId);
+    for (const status of ["transcribed", "review"] as const) {
+      const rows = await ctx.db
+        .query("lessons")
+        .withIndex("by_organization_and_status", (q) =>
+          q.eq("organizationId", orgId).eq("status", status)
+        )
+        .collect();
+      stats.lateMaterials += rows.filter(
+        (l) =>
+          !l.isDeleted &&
+          l.teacherId === teacherId &&
+          Date.now() -
+            (Date.parse(l.sessionStartedAt ?? l.createdAt) + l.durationSeconds * 1000) >
+            policy.lessonPublishHours * 3_600_000
+      ).length;
+    }
     const recentSessions = [...live]
       .sort((a, b) =>
         `${b.date}T${b.startTime}`.localeCompare(`${a.date}T${a.startTime}`)
@@ -651,7 +671,22 @@ export const getTeacherDetailForAdmin = query({
       timeOff,
       stats,
       recentSessions,
+      policy: {
+        teacherMinWeeklyHours: policy.teacherMinWeeklyHours,
+        timeOffApprovalDays: policy.timeOffApprovalDays,
+        lessonPublishHours: policy.lessonPublishHours,
+      },
     };
+  },
+});
+
+/** Dismiss the one-time "lesson rules were updated" banner. */
+export const markPolicySeen = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const { user } = await requireTenant(ctx);
+    await ctx.db.patch(user._id, { policySeenAt: new Date().toISOString() });
+    return null;
   },
 });
 
@@ -1095,6 +1130,22 @@ export const assignTeacher = mutation({
         link: "/teacher/students",
         createdAt: now,
       });
+      const nextTeacher = await ctx.db
+        .query("users")
+        .withIndex("by_organization_and_externalId", (q) =>
+          q.eq("organizationId", orgId).eq("externalId", nextTeacherId),
+        )
+        .first();
+      if (nextTeacher?.name) {
+        await ctx.db.insert("notifications", {
+          organizationId: orgId,
+          recipientId: studentId,
+          kind: "teacher_assigned",
+          payload: { teacherId: nextTeacherId, teacherName: nextTeacher.name },
+          link: "/student/calendar",
+          createdAt: now,
+        });
+      }
     }
 
     await syncAutomaticHomeworkDeadlines(ctx,orgId,studentId);

@@ -35,6 +35,8 @@ export function teacherNoShowDueLevel(opts: {
   nowMs: number;
   startMs: number;
   notifiedLevels: Iterable<number>;
+  lateStartMinutes?: number;
+  noShowMinutes?: number;
 }): TeacherNoShowEscalationLevel | null {
   const notified = new Set(opts.notifiedLevels);
   const stage = teacherNoShowStage(opts);

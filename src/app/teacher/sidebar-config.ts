@@ -8,7 +8,7 @@ export const TEACHER_SIDEBAR: SidebarSection[] = [
       { key: "library", href: "/teacher/library", label: "Library", icon: "book" },
       { key: "students", href: "/teacher/students", label: "Students", icon: "users" },
       { key: "calendar", href: "/teacher/calendar", label: "Calendar", icon: "calendar" },
-      { key: "guide", href: "/teacher/guide", label: "Guide", icon: "info" },
+      { key: "guide", href: "/teacher/guide", label: "Guide & rules", icon: "info" },
     ],
   },
 ];
