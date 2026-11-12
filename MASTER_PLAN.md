@@ -126,7 +126,7 @@ scripts/dev-login.mjs   messages/   POLICY.md
 | Piece | Value |
 |---|---|
 | Vercel | project `omnica-english`, team `fafo-s-projects`. `master` = production (omnicaenglish.com); every other branch gets a login-protected preview URL wired to dev Convex + dev Clerk. Old `next-js-omni-class.vercel.app` 308-redirects to the apex via Vercel domain settings. |
-| Convex prod | `valuable-loris-929` — **manual `npx convex deploy` required for every `convex/` change** (no `CONVEX_DEPLOY_KEY` in Vercel). |
+| Convex prod | `valuable-loris-929` — deployed automatically by the Vercel production build (`vercel.json` runs `convex deploy` with `CONVEX_DEPLOY_KEY`, Production only; previews stay on dev). |
 | Convex dev | `quixotic-quail-572` (`npx convex dev`). |
 | Clerk | App **Omnica English**. Production instance (`ins_3Jzpg…`) serves omnicaenglish.com; development instance `secure-husky-22.clerk.accounts.dev` serves localhost, previews and QA. Identity/session provider only; the `convex` JWT template has no organization claims. |
 | Env — Vercel | `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CONVEX_SITE_URL`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`. |
