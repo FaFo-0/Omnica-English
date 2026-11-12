@@ -46,6 +46,7 @@ import { HomeworkEditor } from "@/components/homework/HomeworkEditor";
 import { scoreDoc } from "@/components/homework/grading";
 import { LessonAudioPlayer } from "@/components/recording/LessonAudioPlayer";
 import { MistakesReview } from "@/components/lessons/MistakesReview";
+import { FixEnglishBar } from "@/components/lessons/FixEnglishBar";
 import { parseJsonCollection, describeJsonAnswer } from "@/lib/ai/jsonCollection";
 import { toast } from "sonner";
 
@@ -456,6 +457,9 @@ export default function SessionReviewPage() {
         {/* Transcript + Audio + Notes */}
         <TabsContent value="transcript" className="mt-3 space-y-3">
           <LessonAudioPlayer lessonId={lessonId} />
+          {lesson.transcript && (
+            <FixEnglishBar lessonId={lessonId} fixed={lesson.transcriptBeforeEnglishFix !== undefined} />
+          )}
           <div
             className="session-transcript-card rounded-lg border bg-card p-5"
             style={{ borderColor: "var(--omnic-gray-100)" }}

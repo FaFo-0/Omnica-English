@@ -38,6 +38,7 @@ import type * as lib_billingState from "../lib/billingState.js";
 import type * as lib_calendarBookingPlan from "../lib/calendarBookingPlan.js";
 import type * as lib_creditExpiry from "../lib/creditExpiry.js";
 import type * as lib_defaultPrompts from "../lib/defaultPrompts.js";
+import type * as lib_englishFix from "../lib/englishFix.js";
 import type * as lib_englishFrequency from "../lib/englishFrequency.js";
 import type * as lib_googleDrive from "../lib/googleDrive.js";
 import type * as lib_homeworkAuthorization from "../lib/homeworkAuthorization.js";
@@ -116,6 +117,7 @@ import type * as studentLessonCleanup from "../studentLessonCleanup.js";
 import type * as study from "../study.js";
 import type * as telegram from "../telegram.js";
 import type * as tenantSettings from "../tenantSettings.js";
+import type * as transcriptEnglish from "../transcriptEnglish.js";
 import type * as users from "../users.js";
 import type * as vacancies from "../vacancies.js";
 
@@ -156,6 +158,7 @@ declare const fullApi: ApiFromModules<{
   "lib/calendarBookingPlan": typeof lib_calendarBookingPlan;
   "lib/creditExpiry": typeof lib_creditExpiry;
   "lib/defaultPrompts": typeof lib_defaultPrompts;
+  "lib/englishFix": typeof lib_englishFix;
   "lib/englishFrequency": typeof lib_englishFrequency;
   "lib/googleDrive": typeof lib_googleDrive;
   "lib/homeworkAuthorization": typeof lib_homeworkAuthorization;
@@ -234,6 +237,7 @@ declare const fullApi: ApiFromModules<{
   study: typeof study;
   telegram: typeof telegram;
   tenantSettings: typeof tenantSettings;
+  transcriptEnglish: typeof transcriptEnglish;
   users: typeof users;
   vacancies: typeof vacancies;
 }>;

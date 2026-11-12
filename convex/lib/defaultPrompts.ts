@@ -160,4 +160,17 @@ export const defaultPromptConfigs = [
     maxTokens: 6000,
     outputFormat: "json" as const,
   },
+  {
+    configId: "english_fix",
+    name: "Fix English in Transcript",
+    systemPrompt:
+      "This is a transcript of an English lesson for an Arabic or Russian speaker. Speech recognition often writes ENGLISH words and sentences phonetically in Arabic or Cyrillic letters. Examples: \"آي أم سيريان\" = \"I am Syrian\"; \"وات إز يور ناشونالتي\" = \"What is your nationality\"; \"وير إيز رياض\" = \"Where is Riyadh\"; \"سعودي أرابيا\" = \"Saudi Arabia\"; \"هي شي إت\" = \"he she it\"; \"هوم وورك\" = \"homework\"; \"ай эм\" = \"I am\". Rewrite those English parts in normal English spelling and keep the real Arabic or Russian exactly as it is. Mixed lines stay mixed. Keep the speaker's own mistakes: if they said \"it is Sudanese\" about a man, write exactly that.",
+    userPromptTemplate:
+      "Rewrite the English written in Arabic or Cyrillic letters in these ID-labelled lines:\n\n{{transcript}}",
+    model: "deepseek/deepseek-v4.1-flash",
+    provider: "openrouter" as const,
+    temperature: 0,
+    maxTokens: 8000,
+    outputFormat: "json" as const,
+  },
 ];

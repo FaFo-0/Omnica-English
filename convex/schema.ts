@@ -382,6 +382,8 @@ export default defineSchema({
     transcript: v.string(),
     // Incremented only when a finalized transcript replaces its structured
     // utterances. Vocabulary occurrences retain the version they came from.
+    // Whole transcript before "Fix English" rewrote it, so Undo is exact.
+    transcriptBeforeEnglishFix: v.optional(v.string()),
     transcriptVersion: v.optional(v.number()),
     summary: v.string(),
     contentStatus: v.object({
@@ -500,6 +502,8 @@ export default defineSchema({
     utteranceId: v.string(),
     transcriptVersion: v.number(),
     text: v.string(),
+    // Text as transcribed, kept when "Fix English" rewrote this line (Undo).
+    originalText: v.optional(v.string()),
     speaker: v.optional(v.string()),
     startMs: v.optional(v.number()),
     endMs: v.optional(v.number()),

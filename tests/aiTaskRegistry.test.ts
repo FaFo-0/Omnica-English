@@ -21,6 +21,7 @@ test("the canonical registry covers every launch AI producer", () => {
     "library_vocabulary",
     "word_gloss",
     "mistake_check",
+    "english_fix",
   ]);
 });
 

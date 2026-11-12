@@ -64,6 +64,8 @@ export class SonioxRecorder {
   private finishPending: (() => void) | null = null;
   /** Set while we close the connection ourselves, so it isn't reported as a drop. */
   private closing = false;
+  /** While true the Meet tab (the student's side) is held back from Soniox. */
+  private tabMuted = false;
   private _onTokens: OnTokensCallback | null = null;
 
   // Audio resources
@@ -199,7 +201,7 @@ export class SonioxRecorder {
     const destination = this.destination;
     if (!context || !destination) return;
     const node = context.createMediaStreamSource(stream);
-    node.connect(destination);
+    if (!this.tabMuted) node.connect(destination);
     this.tabSourceNode = node;
     this.lost.tab = false;
     for (const track of stream.getTracks()) {
@@ -281,6 +283,23 @@ export class SonioxRecorder {
       restored.mic = true;
     }
     return restored;
+  }
+
+  /**
+   * Hold back / restore the Meet tab. "Start with my voice" begins with only
+   * the microphone so the first voice Soniox hears is the teacher's; the tab
+   * joins the same connection once that voice is identified.
+   */
+  setTabMuted(muted: boolean): void {
+    this.tabMuted = muted;
+    const node = this.tabSourceNode;
+    if (!node || !this.destination) return;
+    try {
+      if (muted) node.disconnect(this.destination);
+      else node.connect(this.destination);
+    } catch {
+      /* already in that state */
+    }
   }
 
   /** Which of this session's captured inputs stopped feeding the recording. */

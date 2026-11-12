@@ -256,9 +256,14 @@ export function RecordingPanel({
     teacherSpeakerRef.current = speaker;
     setTeacherSpeaker(speaker);
   };
+  const calibrationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** End the "say hello" step and let the student's side (Meet tab) in. */
   const stopCalibrating = () => {
     calibratingRef.current = false;
     setCalibrating(false);
+    if (calibrationTimerRef.current) clearTimeout(calibrationTimerRef.current);
+    calibrationTimerRef.current = null;
+    clientRef.current?.setTabMuted(false);
   };
   /** Listen for the next voice and label it Teacher; recording carries on. */
   const beginCalibration = () => {
@@ -266,6 +271,12 @@ export function RecordingPanel({
     calibrateFromMsRef.current = last ? last.endMs : 0;
     calibratingRef.current = true;
     setCalibrating(true);
+    // Never hold the student's side back for long: if no voice is heard,
+    // record both sides anyway (Swap labels can still fix a wrong guess).
+    if (calibrationTimerRef.current) clearTimeout(calibrationTimerRef.current);
+    calibrationTimerRef.current = setTimeout(() => {
+      if (calibratingRef.current) stopCalibrating();
+    }, 20_000);
   };
 
   const handleStart = async (options?: { calibrate?: boolean }) => {
@@ -288,6 +299,9 @@ export function RecordingPanel({
     clientRef.current?.cancel();
     const client = new SonioxRecorder({ getApiKey: getSonioxKey, ...(languageHints ? { languageHints } : {}) });
     clientRef.current = client;
+    // Mic first: the first voice Soniox hears is the teacher's. The Meet tab
+    // joins this same connection the moment that voice is identified.
+    if (options?.calibrate && audioSource === "both") client.setTabMuted(true);
 
     await client.start(
       (tokens) => {
@@ -543,20 +557,16 @@ export function RecordingPanel({
                 onUploaded={(storageId, durationSec) => onUploaded?.(storageId, durationSec)}
               />
             ) : (
-              <>
-                <Button onClick={() => void handleStart()} className="gap-2 rounded-full px-5">
-                  <Mic className="h-4 w-4" />
-                  {resumed ? "Continue recording" : t("startRecording")}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => void handleStart({ calibrate: true })}
-                  className="gap-2 rounded-full"
-                  title="Starts recording and labels the next voice it hears as you"
-                >
-                  <UserRoundCheck className="h-4 w-4" /> Start with my voice
-                </Button>
-              </>
+              <Button
+                onClick={() => void handleStart({ calibrate: audioSource !== "tab" })}
+                className="gap-2 rounded-full px-5"
+                title={audioSource === "tab" ? undefined : "Say hello first — your voice is labelled Teacher, then the student's side joins"}
+              >
+                {audioSource === "tab" ? <Mic className="h-4 w-4" /> : <UserRoundCheck className="h-4 w-4" />}
+                {audioSource === "tab"
+                  ? resumed ? "Continue recording" : t("startRecording")
+                  : resumed ? "Continue with my voice" : "Start with my voice"}
+              </Button>
             )
           ) : status === "connecting" ? (
             <Button disabled className="gap-2 rounded-full px-5">
@@ -574,15 +584,11 @@ export function RecordingPanel({
               >
                 {paused ? <><Play className="h-4 w-4" /> Resume</> : <><Pause className="h-4 w-4" /> Pause</>}
               </Button>
-              <Button
-                variant="outline"
-                className="gap-2 rounded-full"
-                onClick={calibrating ? stopCalibrating : beginCalibration}
-                title="Say anything after tapping — your voice is labelled Teacher"
-              >
-                <UserRoundCheck className="h-4 w-4" />
-                {calibrating ? "Listening… (cancel)" : "This is my voice"}
-              </Button>
+              {calibrating && (
+                <Button variant="ghost" className="rounded-full" onClick={stopCalibrating}>
+                  Skip
+                </Button>
+              )}
               {speakers.length > 1 && (
                 <Button
                   variant="ghost"
@@ -613,6 +619,7 @@ export function RecordingPanel({
                   ? "Audio incomplete — reconnect below"
                   : audioSource === "both" ? t("recordingBoth") : audioSource === "tab" ? t("recordingTab") : t("recordingMic")}
             </span>
+            {teacherSpeaker && <span className="font-medium text-green-700 dark:text-green-300">✓ Teacher voice set</span>}
             <span className="text-muted-foreground">audio {formatTime(recordedSeconds)} · saved every {Math.round(PROGRESS_SAVE_MS / 1000)}s</span>
             {clientRef.current && !paused && (
               <span className="ms-auto">
@@ -624,7 +631,8 @@ export function RecordingPanel({
 
         {calibrating && status !== "idle" && (
           <p role="status" className="rounded-lg px-3 py-2 text-sm" style={{ background: "var(--brand-yellow-soft)", color: "var(--brand-purple-deep)" }}>
-            Say a sentence now — the next voice is labelled <strong>Teacher</strong>. Recording carries on.
+            Say hello now — your voice is being set as <strong>Teacher</strong>.
+            {audioSource === "both" && " The student's side joins as soon as it's done."}
           </p>
         )}
 
