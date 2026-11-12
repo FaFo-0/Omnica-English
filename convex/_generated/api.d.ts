@@ -102,6 +102,7 @@ import type * as promptConfigs from "../promptConfigs.js";
 import type * as push from "../push.js";
 import type * as pushNode from "../pushNode.js";
 import type * as qa from "../qa.js";
+import type * as qaDemo from "../qaDemo.js";
 import type * as reports from "../reports.js";
 import type * as retention from "../retention.js";
 import type * as retranscribe from "../retranscribe.js";
@@ -220,6 +221,7 @@ declare const fullApi: ApiFromModules<{
   push: typeof push;
   pushNode: typeof pushNode;
   qa: typeof qa;
+  qaDemo: typeof qaDemo;
   reports: typeof reports;
   retention: typeof retention;
   retranscribe: typeof retranscribe;
