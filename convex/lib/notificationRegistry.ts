@@ -1155,5 +1155,22 @@ export function telegramMessage(
   };
 }
 
+/** Phone push: one line of title, one short body, and where a tap opens.
+ *  Same destination rules as Telegram (lesson join page beats the bell link). */
+export function pushMessage(
+  kind: string,
+  payload: Payload | null | undefined,
+  link?: string,
+  role: NotifRole = "student",
+  locale: NotificationLocale = "en"
+): { title: string; body: string; url: string } {
+  const view = notificationViewForLocale(kind, payload, locale);
+  const p = payload ?? {};
+  const eventId = s(p, "eventId");
+  const joinPath = role !== "admin" && s(p, "googleMeetLink") && eventId ? `/join/${eventId}` : undefined;
+  const url = joinPath || link || notificationDestination(kind, payload, undefined, role) || "/portal";
+  return { title: view.title, body: view.body, url: url.startsWith("/") ? url : "/portal" };
+}
+
 /** Compact name used by reminder copy when only an ID is known. */
 export const notificationName = firstWord;

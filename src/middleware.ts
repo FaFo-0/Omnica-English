@@ -8,6 +8,7 @@ const isPublicRoute = createRouteMatcher([
   "/terms",
   "/policy",
   "/opengraph-image",
+  "/install",
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/preview-login",

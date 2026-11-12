@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Noto_Sans_Arabic } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,6 +7,7 @@ import { OMNICA_FALLBACK } from "@/lib/brand/fallback";
 import { PUBLIC_SHARE_CARD } from "@/lib/publicShareCard";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { PreviewSwitcher } from "@/components/preview/PreviewSwitcher";
+import { PwaBoot } from "@/components/pwa/PwaBoot";
 import { previewLoginEnabled, previewPersonaOptions } from "@/lib/previewLogin";
 import "./globals.css";
 
@@ -48,11 +49,21 @@ export function generateMetadata(): Metadata {
       description: PUBLIC_SHARE_CARD.description,
       images: ["/opengraph-image"],
     },
-    icons: brand.faviconUrl
-      ? [{ rel: "icon", url: brand.faviconUrl }]
-      : undefined,
+    // Explicit icons switch off Next's file-based ones, so the iPhone
+    // Home Screen icon has to be listed here too.
+    icons: {
+      ...(brand.faviconUrl ? { icon: [{ url: brand.faviconUrl }] } : {}),
+      apple: [{ url: "/pwa/apple-touch-icon.png", sizes: "180x180" }],
+    },
+    // iPhone "Add to Home Screen": open full-screen with our name, not the
+    // page title. The manifest (app/manifest.ts) covers Android.
+    appleWebApp: { capable: true, title: brand.name, statusBarStyle: "default" },
   };
 }
+
+export const viewport: Viewport = {
+  themeColor: "#6716A4",
+};
 
 export default function RootLayout({
   children,
@@ -68,6 +79,7 @@ export default function RootLayout({
           <ConvexClientProvider>
             <TooltipProvider>{children}</TooltipProvider>
             <Toaster />
+            <PwaBoot />
             {previewLoginEnabled() && <PreviewSwitcher options={previewPersonaOptions()} />}
           </ConvexClientProvider>
         </ThemeProvider>

@@ -9,7 +9,7 @@ import { formatGap, useTimeUntil } from "@/lib/countdown";
 import { zonedToInstant, instantToZoned } from "@/lib/tz";
 import { useAuth } from "@/lib/auth";
 import { Icon } from "@/components/shared/icons";
-import { TelegramConnectPrompt } from "@/components/shared/TelegramConnectPrompt";
+import { AppInstallBanner } from "@/components/pwa/AppInstallBanner";
 
 function useNow(intervalMs = 30_000): number {
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -72,8 +72,8 @@ export default function TeacherDashboard() {
 
   return (
     <div>
-      {/* Telegram adoption: visible every visit until connected, gone the moment it is */}
-      <TelegramConnectPrompt />
+      {/* Home-screen app + push reminders; gone once this device is on */}
+      <AppInstallBanner />
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 16, marginBottom: 24 }}>
         <div>

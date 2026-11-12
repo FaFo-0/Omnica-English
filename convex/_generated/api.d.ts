@@ -99,6 +99,8 @@ import type * as policyConstants from "../policyConstants.js";
 import type * as pricing from "../pricing.js";
 import type * as pricingSeed from "../pricingSeed.js";
 import type * as promptConfigs from "../promptConfigs.js";
+import type * as push from "../push.js";
+import type * as pushNode from "../pushNode.js";
 import type * as qa from "../qa.js";
 import type * as reports from "../reports.js";
 import type * as retention from "../retention.js";
@@ -215,6 +217,8 @@ declare const fullApi: ApiFromModules<{
   pricing: typeof pricing;
   pricingSeed: typeof pricingSeed;
   promptConfigs: typeof promptConfigs;
+  push: typeof push;
+  pushNode: typeof pushNode;
   qa: typeof qa;
   reports: typeof reports;
   retention: typeof retention;

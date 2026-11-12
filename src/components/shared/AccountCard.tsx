@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { Icon } from "@/components/shared/icons";
 import { PersonTime } from "@/components/shared/PersonTime";
 import { TimezoneSelect } from "@/components/shared/TimezoneSelect";
-import { TelegramNotificationsCard } from "@/components/shared/TelegramNotificationsCard";
+import { AppNotificationsCard } from "@/components/pwa/AppNotificationsCard";
 import { browserTz } from "@/lib/tz";
 import {
   Dialog,
@@ -119,7 +119,7 @@ export function AccountCard() {
         </div>
       </div>
 
-      <TelegramNotificationsCard />
+      <AppNotificationsCard />
 
       <Dialog open={editing} onOpenChange={setEditing}>
         <DialogContent>

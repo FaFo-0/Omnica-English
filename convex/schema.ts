@@ -337,7 +337,8 @@ export default defineSchema({
     telegramConnectedAt: v.optional(v.string()),
     telegramLinkCode: v.optional(v.string()),
     telegramLinkCodeExpiresAt: v.optional(v.string()),
-    // P7 — "Not now" from the dashboard Telegram prompt (30-day snooze).
+    // Retired 2026-11: the dashboard Telegram prompt was replaced by the
+    // app-install banner. Kept so existing rows stay valid.
     telegramPromptDismissedAt: v.optional(v.string()),
     // H.12 — ICS subscription
     icsToken: v.optional(v.string()),
@@ -1439,6 +1440,21 @@ export default defineSchema({
     .index("by_organization", ["organizationId"])
     .index("by_organization_and_key", ["organizationId", "key"]),
 
+  // One row per device that turned on push notifications. A device belongs
+  // to whoever turned it on last (a shared phone follows the signed-in user).
+  pushSubscriptions: defineTable({
+    organizationId: v.string(),
+    userId: v.string(), // users.externalId
+    endpoint: v.string(),
+    p256dh: v.string(),
+    auth: v.string(),
+    platform: v.optional(v.string()), // "ios" | "android" | "desktop"
+    createdAt: v.string(),
+    lastSeenAt: v.string(),
+  })
+    .index("by_endpoint", ["endpoint"])
+    .index("by_organization_and_userId", ["organizationId", "userId"]),
+
   notifications: defineTable({
     organizationId: v.string(),
     recipientId: v.string(), // user externalId
@@ -1464,6 +1480,10 @@ export default defineSchema({
     // that is discarded). Withdrawn rows never reach Telegram and are hidden
     // from the in-app bell.
     withdrawnAt: v.optional(v.string()),
+    // Phone/browser push (installed app). Set once the row has been offered
+    // to every device the recipient had; never re-sent after that.
+    pushSentAt: v.optional(v.string()),
+    pushAttemptCount: v.optional(v.number()),
     createdAt: v.string(),
   })
     .index("by_organization", ["organizationId"])

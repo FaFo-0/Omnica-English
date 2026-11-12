@@ -9,7 +9,7 @@ import { useQuery } from "convex-helpers/react/cache/hooks";
 import { api } from "@convex";
 import { Icon } from "@/components/shared/icons";
 import { AcademyTime, PersonTime } from "@/components/shared/PersonTime";
-import { TelegramConnectionStatus } from "@/components/shared/TelegramConnectionStatus";
+import { NotificationReach } from "@/components/shared/NotificationReach";
 import {
   Dialog,
   DialogContent,
@@ -61,6 +61,7 @@ export default function AdminPeoplePage() {
   const [removeBusy, setRemoveBusy] = useState(false);
   const [showUnpaired, setShowUnpaired] = useState(false);
   const [telegramFilter, setTelegramFilter] = useState("all");
+  const pushUserIds = useQuery(api.push.listReachableUserIds, {});
 
   // POLICY §6 — pause. Admins pause on a student's behalf; the cap is only
   // enforced on the student self-serve path, so this dialog is uncapped.
@@ -120,7 +121,9 @@ export default function AdminPeoplePage() {
   const instructors = allUsers.filter((u: any) => u.role === "teacher");
   const removedUsers = allUsers.filter((u: any) => u.role === "removed");
   const unpairedCount = allStudents.filter((u: any) => !u.teacherId).length;
-  const matchesTelegram = (person: { telegram: { connected: boolean } }) => telegramFilter === "all" || person.telegram.connected === (telegramFilter === "connected");
+  const appReachable = new Set(pushUserIds ?? []);
+  const reachable = (person: { externalId: string; telegram: { connected: boolean } }) => appReachable.has(person.externalId) || person.telegram.connected;
+  const matchesTelegram = (person: { externalId: string; telegram: { connected: boolean } }) => telegramFilter === "all" || reachable(person) === (telegramFilter === "connected");
   const visibleStudents = students.filter(matchesTelegram);
   const visibleInstructors = instructors.filter(matchesTelegram);
   const visibleAdmins = (adminData?.admins ?? []).filter(matchesTelegram);
@@ -192,11 +195,11 @@ export default function AdminPeoplePage() {
       </div>
 
       {tab !== "removed" && <label className="mb-3 flex flex-wrap items-center gap-2 text-sm">
-        Telegram
+        Notifications
         <select className="input w-full sm:w-auto" value={telegramFilter} onChange={event => setTelegramFilter(event.target.value)}>
-          <option value="all">All connection statuses</option>
-          <option value="connected">Connected</option>
-          <option value="not_connected">Not connected</option>
+          <option value="all">Everyone</option>
+          <option value="connected">Reachable (app or Telegram)</option>
+          <option value="not_connected">Not reachable</option>
         </select>
       </label>}
 
@@ -237,7 +240,7 @@ export default function AdminPeoplePage() {
                 <th>Email</th>
                 <th>Local time</th>
                 <th>Status</th>
-                <th>Telegram</th>
+                <th>Notifications</th>
                 {/* Lesson *records*, not the lesson balance — the teacher
                     detail page shows "lessons left" and the two must not read
                     as the same number. */}
@@ -284,7 +287,7 @@ export default function AdminPeoplePage() {
                         </div>
                       )}
                     </td>
-                    <td><TelegramConnectionStatus connection={s.telegram} /></td>
+                    <td><NotificationReach app={appReachable.has(s.externalId)} telegram={s.telegram.connected} /></td>
                     <td>{lessonsByStudent.get(s.externalId) ?? 0}</td>
                     <td className="muted">
                       {s._creationTime ? new Date(s._creationTime).toLocaleDateString() : "—"}
@@ -365,7 +368,7 @@ export default function AdminPeoplePage() {
                 <th>Sessions</th>
                 <th>Owed</th>
                 <th style={{ whiteSpace: "nowrap" }}>Meeting room</th>
-                <th>Telegram</th>
+                <th>Notifications</th>
                 <th>Status</th>
                 <th>Joined</th>
                 <th></th>
@@ -446,7 +449,7 @@ export default function AdminPeoplePage() {
                         <span style={{ color: "var(--feedback-warning)" }}>Not set</span>
                       )}
                     </td>
-                    <td><TelegramConnectionStatus connection={inst.telegram} /></td>
+                    <td><NotificationReach app={appReachable.has(inst.externalId)} telegram={inst.telegram.connected} /></td>
                     <td><span className="pill pill-active">Active</span></td>
                     <td className="muted" style={{ whiteSpace: "nowrap" }}>
                       {inst._creationTime ? new Date(inst._creationTime).toLocaleDateString() : "—"}
@@ -495,7 +498,7 @@ export default function AdminPeoplePage() {
                 <th>Phone</th>
                 <th>Local time</th>
                 <th>Access</th>
-                <th>Telegram</th>
+                <th>Notifications</th>
                 <th>Joined</th>
                 <th></th>
               </tr>
@@ -546,7 +549,7 @@ export default function AdminPeoplePage() {
                         ? `${a.customPermissions.length} custom`
                         : "Admin defaults"}
                   </td>
-                  <td><TelegramConnectionStatus connection={a.telegram} /></td>
+                  <td><NotificationReach app={appReachable.has(a.externalId)} telegram={a.telegram.connected} /></td>
                   <td className="muted" style={{ whiteSpace: "nowrap" }}>
                     {a.joinedAt ? new Date(a.joinedAt).toLocaleDateString() : "—"}
                   </td>
