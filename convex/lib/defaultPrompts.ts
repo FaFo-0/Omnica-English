@@ -147,4 +147,17 @@ export const defaultPromptConfigs = [
     maxTokens: 300,
     outputFormat: "text" as const,
   },
+  {
+    configId: "mistake_check",
+    name: "Speaking Mistakes",
+    systemPrompt:
+      "You are an experienced, encouraging English teacher reviewing what a learner said in a recorded lesson. Find the learner's clear grammar and sentence-structure mistakes so the teacher can review them with the student. Be conservative: a missed small mistake is better than flagging correct English. Spoken English is informal — contractions, short answers and casual phrasing are fine. Speech recognition can mishear; when a line looks garbled rather than wrong, skip it.",
+    userPromptTemplate:
+      "Find the learner's clear mistakes in these ID-labelled lesson lines:\n\n{{transcript}}",
+    model: "deepseek/deepseek-v4.1-flash",
+    provider: "openrouter" as const,
+    temperature: 0.1,
+    maxTokens: 6000,
+    outputFormat: "json" as const,
+  },
 ];

@@ -423,6 +423,31 @@ export default defineSchema({
     .index("by_organization_and_isDeleted", ["organizationId", "isDeleted"]),
 
   // ── Lesson content (normalized) ──────────────────────────────────
+  // Student speaking mistakes found in a lesson transcript (AI-suggested,
+  // teacher-reviewed). `quote` is verified verbatim against the utterance; the
+  // student sees only confirmed rows on a published lesson.
+  lessonMistakes: defineTable({
+    organizationId: v.string(),
+    lessonId: v.id("lessons"),
+    studentId: v.string(),
+    utteranceId: v.string(),
+    transcriptVersion: v.optional(v.number()),
+    sentence: v.string(),
+    quote: v.string(),
+    correction: v.string(),
+    category: v.string(),
+    explanationEn: v.string(),
+    explanation: v.string(), // in the student's language
+    explanationLocale: v.string(),
+    startMs: v.optional(v.number()),
+    endMs: v.optional(v.number()),
+    status: v.union(v.literal("suggested"), v.literal("confirmed"), v.literal("rejected")),
+    reviewedBy: v.optional(v.string()),
+    createdAt: v.string(),
+  })
+    .index("by_lessonId", ["lessonId"])
+    .index("by_organization_and_studentId", ["organizationId", "studentId"]),
+
   lessonVocabulary: defineTable({
     organizationId: v.string(),
     lessonId: v.id("lessons"),

@@ -45,6 +45,7 @@ import { HomeworkBuilder } from "@/components/homework/HomeworkBuilder";
 import { HomeworkEditor } from "@/components/homework/HomeworkEditor";
 import { scoreDoc } from "@/components/homework/grading";
 import { LessonAudioPlayer } from "@/components/recording/LessonAudioPlayer";
+import { MistakesReview } from "@/components/lessons/MistakesReview";
 import { parseJsonCollection, describeJsonAnswer } from "@/lib/ai/jsonCollection";
 import { toast } from "sonner";
 
@@ -440,6 +441,7 @@ export default function SessionReviewPage() {
       <Tabs defaultValue="transcript" className="mt-6">
         <TabsList className="session-tabs-list">
           <TabsTrigger value="transcript">Transcript & Audio</TabsTrigger>
+          <TabsTrigger value="mistakes">Mistakes</TabsTrigger>
           <TabsTrigger value="summary">
             Summary <StatusBadge s={lesson.contentStatus.summary} />
           </TabsTrigger>
@@ -489,6 +491,11 @@ export default function SessionReviewPage() {
               placeholder="Observations, vocabulary to highlight, student mistakes, follow-up ideas…"
             />
           </div>
+        </TabsContent>
+
+        {/* Speaking mistakes: AI suggests, teacher confirms */}
+        <TabsContent value="mistakes" className="mt-3">
+          <MistakesReview lessonId={lessonId} />
         </TabsContent>
 
         {/* Summary */}

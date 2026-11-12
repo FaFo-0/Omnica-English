@@ -26,6 +26,7 @@ import type * as icsInternal from "../icsInternal.js";
 import type * as inLessonQuiz from "../inLessonQuiz.js";
 import type * as lessonAudio from "../lessonAudio.js";
 import type * as lessonContent from "../lessonContent.js";
+import type * as lessonMistakes from "../lessonMistakes.js";
 import type * as lessonPlan from "../lessonPlan.js";
 import type * as lessonTitles from "../lessonTitles.js";
 import type * as lessons from "../lessons.js";
@@ -141,6 +142,7 @@ declare const fullApi: ApiFromModules<{
   inLessonQuiz: typeof inLessonQuiz;
   lessonAudio: typeof lessonAudio;
   lessonContent: typeof lessonContent;
+  lessonMistakes: typeof lessonMistakes;
   lessonPlan: typeof lessonPlan;
   lessonTitles: typeof lessonTitles;
   lessons: typeof lessons;

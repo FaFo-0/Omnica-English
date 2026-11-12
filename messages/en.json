@@ -158,7 +158,9 @@
       "loading": "Loading…",
       "notFoundDetail": "Lesson not found.",
       "words": "words",
-      "noSummaryDetail": "No summary available yet for this lesson."
+      "noSummaryDetail": "No summary available yet for this lesson.",
+      "mistakesTitle": "Your mistakes to learn from",
+      "mistakesIntro": "Your teacher marked these from your lesson. The red words are what you said; the green is the correct way."
     },
     "study": {
       "title": "SRS Study Mode",

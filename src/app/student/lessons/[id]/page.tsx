@@ -9,6 +9,7 @@ import type { Id } from "@convex/dataModel";
 import { useTranslations } from "next-intl";
 import { Icon } from "@/components/shared/icons";
 import { HomeworkEditor } from "@/components/homework/HomeworkEditor";
+import { HighlightedSentence } from "@/components/lessons/MistakesReview";
 
 export default function LessonDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -19,6 +20,7 @@ export default function LessonDetailPage({ params }: { params: Promise<{ id: str
   const vocab = useQuery(api.lessonContent.listVocab, { lessonId }) ?? [];
   const flashcards = useQuery(api.lessonContent.listFlashcards, { lessonId }) ?? [];
   const quizItems = useQuery(api.lessonContent.listQuiz, { lessonId }) ?? [];
+  const mistakes = useQuery(api.lessonMistakes.listForLesson, { lessonId }) ?? [];
   const recordQuizAttempt = useMutation(api.study.recordQuizAttempt);
   const t = useTranslations("student.lessons");
 
@@ -76,6 +78,25 @@ export default function LessonDetailPage({ params }: { params: Promise<{ id: str
           </button>
         )}
       </div>
+
+      {/* Speaking mistakes the teacher confirmed */}
+      {mistakes.length > 0 && (
+        <div className="card" style={{ padding: 24, marginBottom: 16 }}>
+          <div className="h3" style={{ marginBottom: 4 }}>{t("mistakesTitle")} <span className="muted body-sm">({mistakes.length})</span></div>
+          <p className="body-sm" style={{ margin: "0 0 12px", color: "var(--omnic-gray-500)" }}>{t("mistakesIntro")}</p>
+          <div style={{ display: "grid", gap: 12 }}>
+            {mistakes.map((m) => (
+              <div key={m._id} style={{ borderTop: "1px solid var(--omnic-gray-100)", paddingTop: 12 }}>
+                <p className="body" style={{ margin: 0 }} lang="en" dir="ltr"><HighlightedSentence sentence={m.sentence} quote={m.quote} /></p>
+                <p className="body-sm" style={{ margin: "6px 0 0" }} lang="en" dir="ltr">
+                  <strong style={{ color: "var(--feedback-success)" }}>→ {m.correction}</strong>
+                </p>
+                <p className="body-sm" style={{ margin: "4px 0 0", color: "var(--omnic-gray-600)" }} dir="auto">{m.explanation || m.explanationEn}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Vocabulary */}
       {vocab.length > 0 && (
