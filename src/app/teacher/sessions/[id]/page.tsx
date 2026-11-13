@@ -457,9 +457,7 @@ export default function SessionReviewPage() {
         {/* Transcript + Audio + Notes */}
         <TabsContent value="transcript" className="mt-3 space-y-3">
           <LessonAudioPlayer lessonId={lessonId} />
-          {lesson.transcript && (
-            <FixEnglishBar lessonId={lessonId} fixed={lesson.transcriptBeforeEnglishFix !== undefined} />
-          )}
+          {lesson.transcriptBeforeEnglishFix !== undefined && <FixEnglishBar lessonId={lessonId} />}
           <div
             className="session-transcript-card rounded-lg border bg-card p-5"
             style={{ borderColor: "var(--omnic-gray-100)" }}

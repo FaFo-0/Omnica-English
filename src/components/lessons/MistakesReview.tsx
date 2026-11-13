@@ -53,6 +53,7 @@ export function MistakesReview({ lessonId }: { lessonId: Id<"lessons"> }) {
           ? `Found ${result.kept} possible mistake${result.kept === 1 ? "" : "s"} in ${result.checkedLines} student lines`
           : `No clear mistakes in ${result.checkedLines} student lines`,
       );
+      if (result.skippedParts) toast.warning(`${result.skippedParts} part${result.skippedParts === 1 ? "" : "s"} of the lesson couldn't be checked — tap Check again.`);
     } catch (error) {
       toast.error(errText(error));
     } finally {

@@ -69,6 +69,24 @@ export const resolveForGeneration = internalQuery({
   },
 });
 
+/** Same as resolveForGeneration, for background jobs that have no signed-in user. */
+export const _resolveForOrg = internalQuery({
+  args: { taskId: v.string(), organizationId: v.string() },
+  handler: async (ctx, { taskId, organizationId }) => {
+    const task = getAiTask(taskId);
+    if (!task) throw new Error("Unknown AI task");
+    const row = await ctx.db
+      .query("promptConfigs")
+      .withIndex("by_organization_and_configId", (q) =>
+        q.eq("organizationId", organizationId).eq("configId", task.configId)
+      )
+      .unique();
+    const config = row ?? defaultPromptConfigs.find((c) => c.configId === task.configId);
+    if (!config) throw new Error(`AI task "${taskId}" is not configured`);
+    return { ...config, ...task };
+  },
+});
+
 /**
  * Save an edited prompt. The list mixes stored rows with code fallbacks for
  * configs an org was never seeded with, so editing a fallback has to insert

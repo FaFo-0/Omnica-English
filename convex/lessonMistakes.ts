@@ -16,6 +16,7 @@ import { resolveLearnerLocale } from "./users";
 
 const LANGUAGE: Record<string, string> = { ru: "Russian", ar: "Arabic", kk: "Kazakh" };
 const MAX_INPUT_CHARS = 60_000;
+const CHUNK_CHARS = 4_000;
 
 /** Lines the learner said. Without speaker labels every line goes, and the
  * teacher review step is what keeps a teacher line from being "corrected". */
@@ -100,35 +101,68 @@ export const _save = internalMutation({
 /** Ask the AI for the student's mistakes in this lesson (teacher/admin). */
 export const generate = action({
   args: { lessonId: v.id("lessons") },
-  handler: async (ctx, { lessonId }): Promise<{ kept: number; suggested: number; checkedLines: number }> => {
+  handler: async (ctx, { lessonId }): Promise<{ kept: number; suggested: number; checkedLines: number; skippedParts: number }> => {
     const prepared: { lines: string[]; locale: string } = await ctx.runQuery(internal.lessonMistakes._prepare, { lessonId });
     if (!prepared.lines.length) throw new ConvexError("No English lines from the student to check yet.");
     const config = await ctx.runQuery(internal.promptConfigs.resolveForGeneration, { taskId: "mistake_check" });
-    const input = `Learner language for explanations: ${LANGUAGE[prepared.locale] ?? "English"}\n\n${prepared.lines.join("\n\n")}`;
-    const output = await callOpenRouter(config, input);
-    let raw: unknown;
-    try {
-      raw = JSON.parse(output.content.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, ""));
-    } catch {
-      throw new ConvexError("The AI answer was cut off or not readable — please try again.");
-    }
-    const list = raw !== null && typeof raw === "object" && Array.isArray((raw as { items?: unknown }).items)
-      ? ((raw as { items: unknown[] }).items)
-      : [];
+    const header = `Learner language for explanations: ${LANGUAGE[prepared.locale] ?? "English"}`;
     const text = (value: unknown) => (typeof value === "string" ? value : "");
-    const items = list.slice(0, 200).flatMap((value) => {
-      if (value === null || typeof value !== "object") return [];
-      const o = value as Record<string, unknown>;
-      const item = {
-        utteranceId: text(o.utteranceId).trim(), quote: text(o.quote), correction: text(o.correction),
-        category: text(o.category), explanationEn: text(o.explanationEn), explanation: text(o.explanation),
-      };
-      return item.utteranceId && item.quote ? [item] : [];
-    });
+    type Item = { utteranceId: string; quote: string; correction: string; category: string; explanationEn: string; explanation: string };
+    /** One chunk of lines → items, or null when the answer was cut off / unreadable. */
+    const check = async (lines: string[]): Promise<Item[] | null> => {
+      try {
+        const output = await callOpenRouter(config, `${header}\n\n${lines.join("\n\n")}`);
+        const raw: unknown = JSON.parse(output.content.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, ""));
+        const list = raw !== null && typeof raw === "object" && Array.isArray((raw as { items?: unknown }).items)
+          ? (raw as { items: unknown[] }).items
+          : [];
+        return list.flatMap((value) => {
+          if (value === null || typeof value !== "object") return [];
+          const o = value as Record<string, unknown>;
+          const item = {
+            utteranceId: text(o.utteranceId).trim(), quote: text(o.quote), correction: text(o.correction),
+            category: text(o.category), explanationEn: text(o.explanationEn), explanation: text(o.explanation),
+          };
+          return item.utteranceId && item.quote ? [item] : [];
+        });
+      } catch {
+        return null;
+      }
+    };
+    // Long, talkative lessons produce more mistakes than one answer can hold
+    // (Anna, 2026-11-14: "cut off"). Check in chunks; split a failed chunk once.
+    const chunks: string[][] = [[]];
+    let size = 0;
+    for (const line of prepared.lines) {
+      if (size + line.length > CHUNK_CHARS && chunks.at(-1)!.length) {
+        chunks.push([]);
+        size = 0;
+      }
+      chunks.at(-1)!.push(line);
+      size += line.length + 2;
+    }
+    const items: Item[] = [];
+    let failed = 0;
+    for (let i = 0; i < chunks.length; i += 3) {
+      const results = await Promise.all(chunks.slice(i, i + 3).map(async (chunk) => {
+        const first = await check(chunk);
+        if (first) return first;
+        if (chunk.length < 2) return null;
+        const half = Math.ceil(chunk.length / 2);
+        const [a, b] = await Promise.all([check(chunk.slice(0, half)), check(chunk.slice(half))]);
+        if (!a && !b) return null;
+        return [...(a ?? []), ...(b ?? [])];
+      }));
+      for (const result of results) {
+        if (result) items.push(...result);
+        else failed += 1;
+      }
+    }
+    if (failed === chunks.length) throw new ConvexError("The AI couldn't check this lesson right now — please try again.");
     const saved: { kept: number; suggested: number } = await ctx.runMutation(internal.lessonMistakes._save, {
-      lessonId, locale: prepared.locale, items,
+      lessonId, locale: prepared.locale, items: items.slice(0, 300),
     });
-    return { ...saved, checkedLines: prepared.lines.length };
+    return { ...saved, checkedLines: prepared.lines.length, skippedParts: failed };
   },
 });
 

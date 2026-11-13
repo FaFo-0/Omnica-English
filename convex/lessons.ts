@@ -22,6 +22,7 @@ import { POLICY } from "./lib/policy";
 import { chunkTranscript, utteranceIdFor } from "./lib/transcriptChunking";
 import { grantPointsInternal, spendPointsInternal, activateExpiryForEvent, revertExpiryForUnstartedEvent } from "./points";
 import { evaluateAchievements } from "./achievements";
+import { resolveLearnerLocale } from "./users";
 import { assignApprovedForLesson, reopenForLesson } from "./homework";
 import { notifyBestEffort } from "./notifications";
 import { upsertSavedVocabulary } from "./lib/vocabulary";
@@ -1394,6 +1395,11 @@ export const endSession = mutation({
       durationSeconds: liveSessionSeconds(lesson.sessionStartedAt, now, lesson.durationSeconds),
     };
     if (lesson.status === "recording") patch.status = "transcribed";
+    // Arabic-speaking student: Soniox writes much of the English in Arabic
+    // letters, so fix it automatically once the lesson ends (Undo on the page).
+    if (/[\u0600-\u06FF]/.test(lesson.transcript) && (await resolveLearnerLocale(ctx, orgId, lesson.studentId)) === "ar") {
+      await ctx.scheduler.runAfter(0, internal.transcriptEnglish.autoFix, { lessonId: id });
+    }
     if (recordedSeconds !== undefined) {
       patch.recordedSeconds = Math.max(
         0,
