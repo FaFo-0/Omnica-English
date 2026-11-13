@@ -394,6 +394,55 @@ export const shareTarget = query({
   },
 });
 
+/**
+ * Every student's homework in one list for the teacher (admin: the whole
+ * academy), without the worksheet bodies. Powers /teacher/homework.
+ */
+export const listForTeacher = query({
+  args: {},
+  handler: async (ctx) => {
+    const { orgId, user } = await requireTenant(ctx);
+    if (user.role !== "teacher" && user.role !== "admin") return [];
+    const rows = user.role === "admin"
+      ? await ctx.db.query("homework").withIndex("by_organization", (q) => q.eq("organizationId", orgId)).order("desc").take(500)
+      : await ctx.db.query("homework")
+          .withIndex("by_organization_and_teacherId", (q) => q.eq("organizationId", orgId).eq("teacherId", user.externalId))
+          .order("desc").take(500);
+    const names = new Map<string, string>();
+    const titles = new Map<string, string>();
+    const out = [];
+    for (const row of rows) {
+      if (!names.has(row.studentId)) {
+        const student = await ctx.db.query("users")
+          .withIndex("by_organization_and_externalId", (q) => q.eq("organizationId", orgId).eq("externalId", row.studentId)).unique();
+        names.set(row.studentId, student?.name ?? "Student");
+      }
+      if (row.lessonId && !titles.has(row.lessonId)) {
+        const lesson = await ctx.db.get(row.lessonId);
+        titles.set(row.lessonId, lesson && !lesson.isDeleted ? lesson.title : "");
+      }
+      if (row.lessonId && titles.get(row.lessonId) === "") continue; // lesson deleted
+      out.push({
+        _id: row._id,
+        lessonId: row.lessonId ?? null,
+        lessonTitle: row.lessonId ? titles.get(row.lessonId)! : null,
+        studentId: row.studentId,
+        studentName: names.get(row.studentId)!,
+        title: row.title,
+        status: row.status,
+        approved: !!row.approvedAt,
+        dueAt: row.dueAt ?? null,
+        submittedAt: row.submittedAt ?? null,
+        reviewedAt: row.reviewedAt ?? null,
+        score: row.score ?? null,
+        maxScore: row.maxScore ?? null,
+        createdAt: row.createdAt,
+      });
+    }
+    return out;
+  },
+});
+
 export const listForStudent = query({
   args: { studentId: v.optional(v.string()) },
   handler: async (ctx, { studentId }) => {

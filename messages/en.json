@@ -123,7 +123,8 @@
     "settings": "Settings",
     "guide": "Guide & rules",
     "rules": "Rules",
-    "packs": "Lessons & packs"
+    "packs": "Lessons & packs",
+    "homework": "Homework"
   },
   "auth": {
     "loadingPortal": "Loading your portal..."

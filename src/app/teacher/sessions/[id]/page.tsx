@@ -65,6 +65,11 @@ export default function SessionReviewPage() {
   const { id } = useParams<{ id: string }>();
   const lessonId = id as Id<"lessons">;
   const router = useRouter();
+  // ?tab=homework etc. — the Homework page links straight to a tab.
+  const [initialTab] = useState(() => {
+    const tab = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab");
+    return tab && ["transcript", "mistakes", "summary", "vocabulary", "homework"].includes(tab) ? tab : "transcript";
+  });
 
   const lesson = useQuery(api.lessons.get, { id: lessonId });
   const learnerLocale = useQuery(api.users.getLearnerLocale, lesson ? { studentId: lesson.studentId } : "skip");
@@ -439,7 +444,7 @@ export default function SessionReviewPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="transcript" className="mt-6">
+      <Tabs defaultValue={initialTab} className="mt-6">
         <TabsList className="session-tabs-list">
           <TabsTrigger value="transcript">Transcript & Audio</TabsTrigger>
           <TabsTrigger value="mistakes">Mistakes</TabsTrigger>
