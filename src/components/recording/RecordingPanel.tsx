@@ -112,6 +112,8 @@ export function RecordingPanel({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const backupInFlightRef = useRef<Promise<void> | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  /** Latest uploaded snapshot of the current recording segment. */
+  const segmentSnapshotRef = useRef<string | null>(null);
   const audioFlushTimerRef = useRef<ReturnType<typeof setInterval> | null>(
     null
   );
@@ -188,7 +190,14 @@ export function RecordingPanel({
         });
         if (!res.ok) throw new Error(`Upload failed (${res.status})`);
         const { storageId } = (await res.json()) as { storageId: string };
-        await setAudioFile({ lessonId, storageId: storageId as Id<"_storage"> });
+        // Each snapshot holds the whole recording so far: replace this
+        // recording's previous snapshot instead of keeping every copy.
+        await setAudioFile({
+          lessonId,
+          storageId: storageId as Id<"_storage">,
+          ...(segmentSnapshotRef.current ? { supersedes: segmentSnapshotRef.current as Id<"_storage"> } : {}),
+        });
+        segmentSnapshotRef.current = storageId;
       } catch (err) {
         console.error("[audio backup] upload failed", err);
         if (final) throw new Error("Audio could not be saved. Please retry End Session.");
@@ -373,6 +382,7 @@ export function RecordingPanel({
         };
         recorder.start(1000);
         mediaRecorderRef.current = recorder;
+        segmentSnapshotRef.current = null; // a new segment starts its own file
         audioFlushTimerRef.current = setInterval(() => {
           if (!backupInFlightRef.current) {
             backupInFlightRef.current = flushAudio(false).finally(() => { backupInFlightRef.current = null; });
