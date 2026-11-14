@@ -563,3 +563,27 @@ export const _reassignLesson = internalMutation({
     return { fromStudentId, toStudentId, ...rename };
   },
 });
+
+/**
+ * Operator: delete stored files by id, refusing any file a lesson still uses
+ * as its recording. Used once to remove superseded audio snapshots
+ * (2026-11-14); new snapshots replace their predecessor automatically.
+ */
+export const _deleteStorageFiles = internalMutation({
+  args: { ids: v.array(v.id("_storage")) },
+  handler: async (ctx, { ids }) => {
+    const lessons = await ctx.db.query("lessons").collect();
+    const inUse = new Set(lessons.map((lesson) => lesson.audioFileId).filter(Boolean));
+    let deleted = 0;
+    const refused: string[] = [];
+    for (const id of ids) {
+      if (inUse.has(id)) {
+        refused.push(id);
+        continue;
+      }
+      await ctx.storage.delete(id);
+      deleted += 1;
+    }
+    return { deleted, refused };
+  },
+});
