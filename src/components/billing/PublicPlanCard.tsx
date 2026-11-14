@@ -5,22 +5,17 @@ import { Check, ArrowUpRight } from "lucide-react";
 import type { CataloguePackOffer } from "../../../convex/lib/pricingCatalogue";
 import { formatLessonCount as lessonLabel, isLessonCountTitle } from "../../../convex/lib/lessonLabels";
 import { currencyDigits } from "../../../convex/lib/money";
+import { packWhatsappMessage, whatsappHref } from "@/lib/whatsapp";
 
 const accent = "var(--public-accent, var(--brand-purple, #6716A4))";
 const words = {
-  en: { signup: "Sign up", choose: "Choose this pack", whatsapp: "Ask on WhatsApp", payment: "Payment is arranged on WhatsApp.", off: (n: string) => `${n}% off`, validity: (n: string) => `${n} ${n === "1" ? "day" : "days"} from first use` },
-  ru: { signup: "Зарегистрироваться", choose: "Выбрать пакет", whatsapp: "Спросить в WhatsApp", payment: "Оплату согласуем в WhatsApp.", off: (n: string) => `Скидка ${n}%`, validity: (n: string) => `${n} дн. с первого использования` },
-  kk: { signup: "Тіркелу", choose: "Пакетті таңдау", whatsapp: "WhatsApp арқылы сұрау", payment: "Төлем WhatsApp арқылы келісіледі.", off: (n: string) => `${n}% жеңілдік`, validity: (n: string) => `Алғаш пайдаланғаннан бастап ${n} күн` },
-  ar: { signup: "إنشاء حساب", choose: "اختر الباقة", whatsapp: "اسأل عبر واتساب", payment: "يتم ترتيب الدفع عبر واتساب.", off: (n: string) => `خصم ${n}٪`, validity: (n: string) => `صالح لمدة ${n} يومًا من أول استخدام` },
+  en: { signup: "Book", signupTrial: "Book a trial lesson", choose: "Choose this pack", whatsapp: "Ask on WhatsApp", payment: "Payment is arranged on WhatsApp.", off: (n: string) => `${n}% off`, validity: (n: string) => `${n} ${n === "1" ? "day" : "days"} from first use` },
+  ru: { signup: "Записаться", signupTrial: "Записаться на пробный урок", choose: "Выбрать пакет", whatsapp: "Спросить в WhatsApp", payment: "Оплату согласуем в WhatsApp.", off: (n: string) => `Скидка ${n}%`, validity: (n: string) => `${n} дн. с первого использования` },
+  kk: { signup: "Жазылу", signupTrial: "Сынақ сабағына жазылу", choose: "Пакетті таңдау", whatsapp: "WhatsApp арқылы сұрау", payment: "Төлем WhatsApp арқылы келісіледі.", off: (n: string) => `${n}% жеңілдік`, validity: (n: string) => `Алғаш пайдаланғаннан бастап ${n} күн` },
+  ar: { signup: "احجز", signupTrial: "احجز درسًا تجريبيًا", choose: "اختر الباقة", whatsapp: "اسأل عبر واتساب", payment: "يتم ترتيب الدفع عبر واتساب.", off: (n: string) => `خصم ${n}٪`, validity: (n: string) => `صالح لمدة ${n} يومًا من أول استخدام` },
 };
-function contactHref(value: string | undefined, offer: CataloguePackOffer, price: string) {
-  if (!value) return null;
-  try {
-    const url = new URL(value);
-    if (url.protocol !== "https:" || url.hostname !== "wa.me") return null;
-    if (/^\/\d+\/?$/.test(url.pathname)) url.searchParams.set("text", `${offer.name} — ${price}`);
-    return url.href;
-  } catch { return null; }
+function contactHref(value: string | undefined, offer: CataloguePackOffer, price: string, locale: string) {
+  return whatsappHref(value, packWhatsappMessage(locale, offer.name, price));
 }
 function signupHref(value: string | undefined, offer: CataloguePackOffer) {
   if (!value) return undefined;
@@ -49,7 +44,8 @@ export function PublicPlanCard({ offer, locale, primaryHref, onChoose, primaryLa
   const money = (amount: number) => new Intl.NumberFormat(lang, { style: "currency", currency: offer.currency, currencyDisplay: "narrowSymbol", minimumFractionDigits: Number.isInteger(amount) ? 0 : currencyDigits(offer.currency), maximumFractionDigits: currencyDigits(offer.currency) }).format(amount);
   const price = money(offer.netPrice);
   const percentage = (offer as CataloguePackOffer & { salePercent?: number }).salePercent ?? (offer.listPrice > 0 ? Math.round((1 - offer.netPrice / offer.listPrice) * 100) : 0);
-  const contact = contactHref(whatsappUrl, offer, price);
+  const signupLabel = offer.lessons === 1 ? t.signupTrial : t.signup;
+  const contact = contactHref(whatsappUrl, offer, price, lang);
   const destination = signupHref(primaryHref, offer);
   const genericTitle = isLessonCountTitle(offer.name, offer.lessons);
   const primaryClass = `inline-flex min-h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-center text-sm font-bold text-white transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-purple-600 ${preview ? "" : "disabled:cursor-not-allowed disabled:opacity-50"}`;
@@ -78,7 +74,7 @@ export function PublicPlanCard({ offer, locale, primaryHref, onChoose, primaryLa
       </div>
       <ul className={`mb-6 mt-5 flex-1 space-y-3 ${compact ? "lg:grid lg:grid-cols-2 lg:gap-x-5 lg:gap-y-2 lg:space-y-0" : ""}`}>{offer.benefits.map((benefit, index) => <li key={`${index}-${benefit}`} className="flex items-start gap-2.5 text-sm leading-relaxed text-[#594668]"><Check size={17} aria-hidden="true" className="mt-0.5 shrink-0" style={{ color: accent }} /><span dir="auto">{benefit}</span></li>)}</ul>
       <div className="flex items-stretch gap-2">
-        {destination && !disabled && !preview ? <Link href={destination} onClick={rememberSelection} className={primaryClass} style={{ backgroundColor: accent }}>{t.signup}<ArrowUpRight size={16} aria-hidden="true" className="shrink-0" /></Link> : <button type="button" onClick={preview ? undefined : onChoose} disabled={disabled || preview} className={primaryClass} style={{ backgroundColor: accent }}>{destination || preview ? t.signup : primaryLabel ?? t.choose}<ArrowUpRight size={16} aria-hidden="true" className="shrink-0" /></button>}
+        {destination && !disabled && !preview ? <Link href={destination} onClick={rememberSelection} className={primaryClass} style={{ backgroundColor: accent }}>{signupLabel}<ArrowUpRight size={16} aria-hidden="true" className="shrink-0" /></Link> : <button type="button" onClick={preview ? undefined : onChoose} disabled={disabled || preview} className={primaryClass} style={{ backgroundColor: accent }}>{destination || preview ? signupLabel : primaryLabel ?? t.choose}<ArrowUpRight size={16} aria-hidden="true" className="shrink-0" /></button>}
         {contact && (preview ? <button type="button" disabled aria-label={t.whatsapp} title={t.whatsapp} className="inline-flex min-h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-purple-200 bg-[#f3edfa]" style={{ color: accent }}><WhatsAppIcon /></button> : <a href={contact} target="_blank" rel="noreferrer" aria-label={t.whatsapp} title={t.whatsapp} className="inline-flex min-h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-purple-200 bg-[#f3edfa] transition-colors hover:bg-purple-100 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-purple-600" style={{ color: accent }}><WhatsAppIcon /></a>)}
       </div>
       {(destination || preview) && <p className="mt-3 text-xs leading-relaxed text-[#776587]">{t.payment}</p>}

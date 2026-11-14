@@ -29,7 +29,11 @@ import {
   Play,
   Upload,
   Loader2,
+  UserRoundCheck,
+  ArrowLeftRight,
+  ArrowDown,
 } from "lucide-react";
+import { MicCheck } from "./MicCheck";
 import { WaveformVisualizer } from "./WaveformVisualizer";
 import type { Id } from "@convex/dataModel";
 
@@ -58,6 +62,8 @@ interface RecordingPanelProps {
   savedRecordedSeconds?: number;
   /** Called with the total captured-audio seconds so the page can end cleanly. */
   onRecordedSeconds?: (seconds: number) => void;
+  /** Soniox language hints: English first, then the student's language. */
+  languageHints?: string[];
   /** Called with the session's durable start once recording begins. */
   onSessionStarted?: (sessionStartedAt: string | null) => void;
 }
@@ -71,6 +77,7 @@ export function RecordingPanel({
   savedRecordedSeconds = 0,
   onRecordedSeconds,
   onSessionStarted,
+  languageHints,
   ref,
 }: RecordingPanelProps) {
   const t = useTranslations("recording");
@@ -92,12 +99,21 @@ export function RecordingPanel({
     tab: false,
   });
   const [reconnecting, setReconnecting] = useState(false);
+  // "This is my voice": the Soniox speaker the teacher identified. Speaker ids
+  // only mean something inside one recording connection, so it resets on Start.
+  const [teacherSpeaker, setTeacherSpeaker] = useState<string | null>(null);
+  const teacherSpeakerRef = useRef<string | null>(null);
+  const [calibrating, setCalibrating] = useState(false);
+  const calibratingRef = useRef(false);
+  const calibrateFromMsRef = useRef(0);
 
   const clientRef = useRef<SonioxRecorder | null>(null);
   const tokensBufferRef = useRef<TranscriptToken[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const backupInFlightRef = useRef<Promise<void> | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  /** Latest uploaded snapshot of the current recording segment. */
+  const segmentSnapshotRef = useRef<string | null>(null);
   const audioFlushTimerRef = useRef<ReturnType<typeof setInterval> | null>(
     null
   );
@@ -129,7 +145,7 @@ export function RecordingPanel({
 
   /** Saved transcript + everything transcribed in this recording segment. */
   const buildFullTranscript = useCallback((tokens: TranscriptToken[]) => {
-    const segment = buildTranscript(tokens);
+    const segment = buildTranscript(tokens, teacherSpeakerRef.current);
     const prefix = prefixRef.current;
     if (!prefix) return segment;
     if (!segment) return prefix;
@@ -138,7 +154,7 @@ export function RecordingPanel({
 
   const buildSegmentUtterances = useCallback((tokens: TranscriptToken[]) => {
     if (tokens.length === 0) return undefined;
-    return buildUtterances(tokens).map(({ id, ...utterance }) => ({
+    return buildUtterances(tokens, teacherSpeakerRef.current).map(({ id, ...utterance }) => ({
       ...utterance,
       utteranceId: `${batchIdRef.current}${id}`,
     }));
@@ -174,7 +190,14 @@ export function RecordingPanel({
         });
         if (!res.ok) throw new Error(`Upload failed (${res.status})`);
         const { storageId } = (await res.json()) as { storageId: string };
-        await setAudioFile({ lessonId, storageId: storageId as Id<"_storage"> });
+        // Each snapshot holds the whole recording so far: replace this
+        // recording's previous snapshot instead of keeping every copy.
+        await setAudioFile({
+          lessonId,
+          storageId: storageId as Id<"_storage">,
+          ...(segmentSnapshotRef.current ? { supersedes: segmentSnapshotRef.current as Id<"_storage"> } : {}),
+        });
+        segmentSnapshotRef.current = storageId;
       } catch (err) {
         console.error("[audio backup] upload failed", err);
         if (final) throw new Error("Audio could not be saved. Please retry End Session.");
@@ -194,7 +217,7 @@ export function RecordingPanel({
     const tokens = tokensBufferRef.current;
     const transcript = buildFullTranscript(tokens);
     if (!transcript.trim()) return;
-    const key = `${transcript.length}:${tokens.length}`;
+    const key = `${transcript.length}:${tokens.length}:${teacherSpeakerRef.current ?? ""}`;
     if (key === lastSnapshotRef.current) return;
     try {
       await saveSessionProgress({
@@ -238,8 +261,42 @@ export function RecordingPanel({
     return () => window.removeEventListener("beforeunload", handler);
   }, [status]);
 
-  const handleStart = async () => {
+  const assignTeacher = (speaker: string | null) => {
+    teacherSpeakerRef.current = speaker;
+    setTeacherSpeaker(speaker);
+  };
+  const calibrationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** End the "say hello" step and let the student's side (Meet tab) in. */
+  const stopCalibrating = () => {
+    calibratingRef.current = false;
+    setCalibrating(false);
+    if (calibrationTimerRef.current) clearTimeout(calibrationTimerRef.current);
+    calibrationTimerRef.current = null;
+    clientRef.current?.setTabMuted(false);
+  };
+  /** Listen for the next voice and label it Teacher; recording carries on. */
+  const beginCalibration = () => {
+    const last = tokensBufferRef.current.at(-1);
+    calibrateFromMsRef.current = last ? last.endMs : 0;
+    calibratingRef.current = true;
+    setCalibrating(true);
+    // Never hold the student's side back for long: if no voice is heard,
+    // record both sides anyway (Swap labels can still fix a wrong guess).
+    if (calibrationTimerRef.current) clearTimeout(calibrationTimerRef.current);
+    calibrationTimerRef.current = setTimeout(() => {
+      if (calibratingRef.current) stopCalibrating();
+    }, 20_000);
+  };
+
+  const handleStart = async (options?: { calibrate?: boolean }) => {
     setError(null);
+    // Bug 2026-11-11: a pause left on when the connection dropped stayed on in
+    // the next connection, so every word was silently thrown away.
+    pausedRef.current = false;
+    setPaused(false);
+    assignTeacher(null);
+    if (options?.calibrate) beginCalibration();
+    else stopCalibrating();
     setLostCapture({ mic: false, tab: false });
     if (mediaRecorderRef.current) {
       await backupInFlightRef.current;
@@ -249,8 +306,11 @@ export function RecordingPanel({
     }
     if (audioFlushTimerRef.current) clearInterval(audioFlushTimerRef.current);
     clientRef.current?.cancel();
-    const client = new SonioxRecorder({ getApiKey: getSonioxKey });
+    const client = new SonioxRecorder({ getApiKey: getSonioxKey, ...(languageHints ? { languageHints } : {}) });
     clientRef.current = client;
+    // Mic first: the first voice Soniox hears is the teacher's. The Meet tab
+    // joins this same connection the moment that voice is identified.
+    if (options?.calibrate && audioSource === "both") client.setTabMuted(true);
 
     await client.start(
       (tokens) => {
@@ -258,6 +318,15 @@ export function RecordingPanel({
         // WebSocket alive so the timer (and future audio backup)
         // keeps running.
         if (pausedRef.current) return;
+        if (calibratingRef.current) {
+          const voice = tokens.find(
+            (t) => t.isFinal && t.speaker && t.startMs >= calibrateFromMsRef.current && /\p{L}/u.test(t.text)
+          );
+          if (voice?.speaker) {
+            assignTeacher(voice.speaker);
+            stopCalibrating();
+          }
+        }
         setLiveTokens((prev) => {
           const finalTokens = prev.filter((t) => t.isFinal);
           const newTokens = [...finalTokens, ...tokens];
@@ -271,6 +340,9 @@ export function RecordingPanel({
       (newStatus) => {
         setStatus(newStatus);
         if (newStatus === "error" || newStatus === "disconnected") {
+          pausedRef.current = false;
+          setPaused(false);
+          stopCalibrating();
           // Keep what was transcribed: the session is still live and the
           // teacher can start again without losing the earlier part.
           void saveProgress();
@@ -310,6 +382,7 @@ export function RecordingPanel({
         };
         recorder.start(1000);
         mediaRecorderRef.current = recorder;
+        segmentSnapshotRef.current = null; // a new segment starts its own file
         audioFlushTimerRef.current = setInterval(() => {
           if (!backupInFlightRef.current) {
             backupInFlightRef.current = flushAudio(false).finally(() => { backupInFlightRef.current = null; });
@@ -443,105 +516,50 @@ export function RecordingPanel({
   const isIdle = status === "idle" || status === "disconnected" || status === "error";
   const resumed = prefixRef.current.length > 0;
   const captureIncomplete = lostCapture.mic || lostCapture.tab;
+  const speakerMap = buildSpeakerLabels(liveTokens, teacherSpeaker);
+  const speakers = [...new Set(liveTokens.filter((t) => t.isFinal && t.speaker).map((t) => t.speaker!))];
+  const currentTeacher = teacherSpeaker ?? speakers[0] ?? null;
+
+  // The transcript scrolls on its own and follows new speech, unless the
+  // teacher scrolled up to read something.
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [following, setFollowing] = useState(true);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && following) el.scrollTop = el.scrollHeight;
+  }, [liveTokens, following]);
 
   return (
-    <div className="space-y-6" translate="no">
-      {/* Audio Source Selector — only visible before recording starts */}
-      {isIdle && (
-        <div className="rounded-xl border bg-card p-4">
-          <h3 className="mb-3 text-sm font-semibold">{t("audioSource")}</h3>
-          <div className="grid gap-2 grid-cols-2 sm:grid-cols-4">
+    <div className="flex h-full min-h-0 flex-col" translate="no">
+      {/* ── Control bar ── */}
+      <div className="shrink-0 space-y-3 border-b p-3" style={{ borderColor: "var(--omnic-gray-100)" }}>
+        {isIdle && (
+          <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label={t("audioSource")}>
+            <span className="me-1 text-xs font-semibold text-muted-foreground">{t("audioSource")}</span>
             {AUDIO_SOURCES.map((src) => {
               const Icon = src.icon;
               const selected = audioSource === src.value;
               return (
                 <button
                   key={src.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  title={t(src.descKey)}
                   onClick={() => setAudioSource(src.value)}
-                  className={`flex items-center gap-3 rounded-lg border-2 p-3 text-start transition-all ${
-                    selected
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/50"
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                    selected ? "border-primary bg-primary/10 text-brand-purple" : "border-border hover:border-primary/50"
                   }`}
                 >
-                  <Icon
-                    className={`h-5 w-5 shrink-0 ${selected ? "text-brand-purple" : "text-muted-foreground"}`}
-                  />
-                  <div>
-                    <p className={`text-sm font-medium ${selected ? "text-brand-purple" : ""}`}>
-                      {t(src.labelKey)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{t(src.descKey)}</p>
-                  </div>
+                  <Icon className="h-3.5 w-3.5" />
+                  {t(src.labelKey)}
                 </button>
               );
             })}
           </div>
-          {audioSource !== "mic" && (
-            <p className="mt-3 text-xs text-muted-foreground">
-              {t("tabShareNote")}
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Session clock & Controls */}
-      <div className="flex flex-col items-center gap-6 py-8">
-        <div className="text-5xl font-bold tabular-nums tracking-wider text-foreground">
-          {formatTime(sessionSeconds)}
-        </div>
-
-        {captureIncomplete && status === "connected" && (
-          <div
-            role="alert"
-            className="w-full max-w-2xl rounded-xl border-2 p-4"
-            style={{ borderColor: "var(--brand-yellow)", background: "var(--brand-yellow-soft)" }}
-          >
-            <p className="text-sm font-semibold" style={{ color: "var(--brand-purple-deep)" }}>
-              Audio is missing from this recording
-            </p>
-            <p className="mt-1 text-sm" style={{ color: "var(--brand-purple-deep)" }}>
-              {lostCapture.tab &&
-                "The shared Google Meet tab stopped, so the student's voice is not being captured. "}
-              {lostCapture.mic &&
-                "Your microphone stopped, so your own voice is not being captured. "}
-              Reconnect and pick the same input again — the recording continues in the same file,
-              with the same transcript and timer.
-            </p>
-            <Button
-              onClick={handleReconnectCapture}
-              disabled={reconnecting}
-              className="mt-3 gap-2"
-              style={{ background: "var(--brand-purple-deep)", color: "white", border: "none" }}
-            >
-              {reconnecting ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" /> Reconnecting…
-                </>
-              ) : (
-                <>
-                  <MonitorSpeaker size={14} /> Reconnect audio
-                </>
-              )}
-            </Button>
-          </div>
         )}
 
-        {resumed && (
-          <p className="max-w-xl text-center text-sm" style={{ color: "var(--omnic-gray-600)" }}>
-            Continuing a saved session — {Math.max(1, Math.round(prefixRef.current.length / 1000))}k
-            characters of transcript are already saved. Starting the recording again adds to them.
-          </p>
-        )}
-
-        {/* Waveform */}
-        {status === "connected" && clientRef.current && (
-          <WaveformVisualizer
-            analyserNode={clientRef.current.getAnalyserNode()}
-          />
-        )}
-
-        <div className="flex gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           {isIdle ? (
             audioSource === "upload" ? (
               <UploadButton
@@ -550,140 +568,174 @@ export function RecordingPanel({
               />
             ) : (
               <Button
-                size="lg"
-                onClick={handleStart}
-                className="gap-2 rounded-full px-8"
+                onClick={() => void handleStart({ calibrate: audioSource !== "tab" })}
+                className="gap-2 rounded-full px-5"
+                title={audioSource === "tab" ? undefined : "Say hello first — your voice is labelled Teacher, then the student's side joins"}
               >
-                <Mic className="h-5 w-5" />
-                <span>{resumed ? "Continue recording" : t("startRecording")}</span>
+                {audioSource === "tab" ? <Mic className="h-4 w-4" /> : <UserRoundCheck className="h-4 w-4" />}
+                {audioSource === "tab"
+                  ? resumed ? "Continue recording" : t("startRecording")
+                  : resumed ? "Continue with my voice" : "Start with my voice"}
               </Button>
             )
           ) : status === "connecting" ? (
-            <Button size="lg" disabled className="gap-2 rounded-full px-8">
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              <span>{t("connecting")}</span>
+            <Button disabled className="gap-2 rounded-full px-5">
+              <Loader2 className="h-4 w-4 animate-spin" /> {t("connecting")}
             </Button>
           ) : (
-            <Button
-              size="lg"
-              onClick={() => {
-                pausedRef.current = !pausedRef.current;
-                setPaused(pausedRef.current);
-              }}
-              className="gap-2 rounded-full px-6"
-              style={{
-                background: paused ? "var(--primary)" : "#f59e0b",
-                color: "white",
-                border: "none",
-              }}
-            >
-              {paused ? (
-                <>
-                  <Play className="h-4 w-4" /><span>Resume</span>
-                </>
-              ) : (
-                <>
-                  <Pause className="h-4 w-4" /><span>Pause</span>
-                </>
+            <>
+              <Button
+                onClick={() => {
+                  pausedRef.current = !pausedRef.current;
+                  setPaused(pausedRef.current);
+                }}
+                className="gap-2 rounded-full px-5"
+                style={{ background: paused ? "var(--primary)" : "#f59e0b", color: "white", border: "none" }}
+              >
+                {paused ? <><Play className="h-4 w-4" /> Resume</> : <><Pause className="h-4 w-4" /> Pause</>}
+              </Button>
+              {calibrating && (
+                <Button variant="ghost" className="rounded-full" onClick={stopCalibrating}>
+                  Skip
+                </Button>
               )}
-            </Button>
+              {speakers.length > 1 && (
+                <Button
+                  variant="ghost"
+                  className="gap-2 rounded-full"
+                  title="Teacher and Student labels are the wrong way round"
+                  onClick={() => {
+                    const index = speakers.indexOf(currentTeacher ?? "");
+                    assignTeacher(speakers[(index + 1) % speakers.length]);
+                  }}
+                >
+                  <ArrowLeftRight className="h-4 w-4" /> Swap labels
+                </Button>
+              )}
+            </>
           )}
+          <div className="ms-auto">
+            <MicCheck />
+          </div>
         </div>
 
-        {paused && status === "connected" && (
-          <div
-            className="rounded-lg px-4 py-2 text-sm"
-            style={{
-              background: "var(--brand-yellow-soft)",
-              color: "var(--brand-purple-deep)",
-              border: "1px solid var(--brand-yellow)",
-            }}
-          >
-            ⏸ Transcription paused — lesson timer keeps running
+        {status === "connected" && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+            <span className="flex items-center gap-1.5 font-medium text-brand-purple">
+              <span className={`h-2 w-2 rounded-full ${paused ? "bg-amber-500" : captureIncomplete ? "bg-amber-500" : "animate-pulse bg-red-500"}`} />
+              {paused
+                ? "Paused — nothing is transcribed until you resume"
+                : captureIncomplete
+                  ? "Audio incomplete — reconnect below"
+                  : audioSource === "both" ? t("recordingBoth") : audioSource === "tab" ? t("recordingTab") : t("recordingMic")}
+            </span>
+            {teacherSpeaker && <span className="font-medium text-green-700 dark:text-green-300">✓ Teacher voice set</span>}
+            <span className="text-muted-foreground">audio {formatTime(recordedSeconds)} · saved every {Math.round(PROGRESS_SAVE_MS / 1000)}s</span>
+            {clientRef.current && !paused && (
+              <span className="ms-auto">
+                <WaveformVisualizer analyserNode={clientRef.current.getAnalyserNode()} compact />
+              </span>
+            )}
           </div>
         )}
 
-        {status === "connected" && (
-          <p className="flex items-center gap-2 text-sm text-brand-purple">
-            <span
-              className={`h-2 w-2 rounded-full ${
-                captureIncomplete ? "bg-amber-500" : "animate-pulse bg-red-500"
-              }`}
-            />
-            {captureIncomplete ? (
-              <span>Audio incomplete — reconnect above</span>
-            ) : (
-              <>
-                {audioSource === "both" && t("recordingBoth")}
-                {audioSource === "tab" && t("recordingTab")}
-                {audioSource === "mic" && t("recordingMic")}
-              </>
-            )}
-            <span className="text-muted-foreground">
-              · saved to the lesson every {Math.round(PROGRESS_SAVE_MS / 1000)}s · audio{" "}
-              {formatTime(recordedSeconds)}
-            </span>
+        {calibrating && status !== "idle" && (
+          <p role="status" className="rounded-lg px-3 py-2 text-sm" style={{ background: "var(--brand-yellow-soft)", color: "var(--brand-purple-deep)" }}>
+            Say hello now — your voice is being set as <strong>Teacher</strong>.
+            {audioSource === "both" && " The student's side joins as soon as it's done."}
           </p>
+        )}
+
+        {captureIncomplete && status === "connected" && (
+          <div role="alert" className="rounded-xl border-2 p-3" style={{ borderColor: "var(--brand-yellow)", background: "var(--brand-yellow-soft)" }}>
+            <p className="text-sm font-semibold" style={{ color: "var(--brand-purple-deep)" }}>Audio is missing from this recording</p>
+            <p className="mt-1 text-sm" style={{ color: "var(--brand-purple-deep)" }}>
+              {lostCapture.tab && "The shared Google Meet tab stopped, so the student's voice is not being captured. "}
+              {lostCapture.mic && "Your microphone stopped, so your own voice is not being captured. "}
+              Reconnect and pick the same input again — the recording continues in the same file.
+            </p>
+            <Button
+              onClick={handleReconnectCapture}
+              disabled={reconnecting}
+              className="mt-2 gap-2"
+              style={{ background: "var(--brand-purple-deep)", color: "white", border: "none" }}
+            >
+              {reconnecting ? <><Loader2 size={14} className="animate-spin" /> Reconnecting…</> : <><MonitorSpeaker size={14} /> Reconnect audio</>}
+            </Button>
+          </div>
+        )}
+
+        {isIdle && audioSource !== "mic" && audioSource !== "upload" && (
+          <p className="text-xs text-muted-foreground">{t("tabShareNote")}</p>
+        )}
+
+        {error && (
+          <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-2 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {error}
+          </div>
         )}
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          {error}
-        </div>
-      )}
-
-      {/* Live Transcript */}
-      <div className="rounded-xl border bg-card p-4">
-        <h3 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-          {t("liveTranscript")}
-        </h3>
-        <div className="min-h-[120px] text-lg leading-relaxed" lang="en">
-          {liveTokens.length === 0 && status !== "connected" && (
-            <p className="text-muted-foreground/50 text-center">
-              {resumed
-                ? "The saved transcript is kept — start recording to continue it."
-                : t("startToSee")}
-            </p>
+      {/* ── Transcript: scrolls on its own ── */}
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={scrollRef}
+          onScroll={(event) => {
+            const el = event.currentTarget;
+            setFollowing(el.scrollHeight - el.scrollTop - el.clientHeight < 80);
+          }}
+          className="h-full overflow-y-auto px-4 py-3 text-lg leading-relaxed"
+          lang="en"
+          data-live-transcript
+        >
+          {resumed && (
+            <details className="mb-3 rounded-lg border bg-muted/30 px-3 py-2 text-sm">
+              <summary className="cursor-pointer text-muted-foreground">
+                Earlier in this session · {Math.max(1, Math.round(prefixRef.current.length / 1000))}k characters saved
+              </summary>
+              <pre className="mt-2 whitespace-pre-wrap font-sans text-sm leading-relaxed">{prefixRef.current}</pre>
+            </details>
           )}
-          {liveTokens.length === 0 && status === "connected" && (
-            <p className="text-muted-foreground/50 text-center">
-              {t("listening")}
+          {liveTokens.length === 0 && (
+            <p className="py-10 text-center text-base text-muted-foreground/60">
+              {status === "connected"
+                ? t("listening")
+                : resumed
+                  ? "The saved transcript is kept — start recording to continue it."
+                  : t("startToSee")}
             </p>
           )}
           {(() => {
-            const speakerMap = buildSpeakerLabels(liveTokens);
             let lastShown = "";
             return liveTokens.map((token, i) => {
-              let label = "";
-              if (token.speaker) {
-                label = speakerMap.get(token.speaker) ?? "";
-              }
+              const label = token.speaker ? speakerMap.get(token.speaker) ?? "" : "";
               const showLabel = label !== "" && label !== lastShown;
               if (showLabel) lastShown = label;
               return (
                 <span key={`${i}-${token.startMs}`}>
                   {showLabel && (
-                    <span className="mt-2 mb-1 block text-xs font-semibold text-brand-purple">
-                      {label}:
+                    <span
+                      className={`mt-3 mb-0.5 block text-xs font-semibold ${label === "Teacher" ? "text-brand-purple" : "text-emerald-700 dark:text-emerald-300"}`}
+                    >
+                      {label}
                     </span>
                   )}
-                  <span
-                    className={
-                      token.isFinal
-                        ? "text-foreground"
-                        : "text-foreground/40"
-                    }
-                  >
-                    {token.text}
-                  </span>
+                  <span className={token.isFinal ? "text-foreground" : "text-foreground/40"}>{token.text}</span>
                 </span>
               );
             });
           })()}
         </div>
+        {!following && liveTokens.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setFollowing(true)}
+            className="absolute bottom-3 end-4 flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow"
+          >
+            <ArrowDown className="h-3.5 w-3.5" /> Latest
+          </button>
+        )}
       </div>
     </div>
   );

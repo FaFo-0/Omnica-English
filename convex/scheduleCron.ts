@@ -22,6 +22,8 @@ import {
   transitionNoShowForEvent,
 } from "./lib/teacherNoShow";
 import { wallTimeToMs } from "./lib/time";
+import { loadPolicy } from "./lib/policySettings";
+import type { PolicyValues } from "./lib/policy";
 
 export const checkTeacherNoShowsCron = internalMutation({
   args: {},
@@ -29,6 +31,14 @@ export const checkTeacherNoShowsCron = internalMutation({
     const now = Date.now();
     // Stored times are academy wall-clock — resolve each org's timezone once.
     const tzCache = new Map<string, string>();
+    const policyCache = new Map<string, PolicyValues>();
+    const orgPolicy = async (organizationId: string): Promise<PolicyValues> => {
+      const hit = policyCache.get(organizationId);
+      if (hit) return hit;
+      const policy = await loadPolicy(ctx, organizationId);
+      policyCache.set(organizationId, policy);
+      return policy;
+    };
     const orgTz = async (organizationId: string): Promise<string> => {
       const hit = tzCache.get(organizationId);
       if (hit) return hit;
@@ -190,10 +200,13 @@ export const checkTeacherNoShowsCron = internalMutation({
       const fired = new Set(
         (evt.noShowNotifications ?? []).map((n) => n.level)
       );
+      const policy = await orgPolicy(evt.organizationId);
       const level = teacherNoShowDueLevel({
         nowMs: now,
         startMs,
         notifiedLevels: fired,
+        lateStartMinutes: policy.noShowPingMinutes,
+        noShowMinutes: policy.noShowWaitMinutes,
       });
       if (level === null) continue;
 

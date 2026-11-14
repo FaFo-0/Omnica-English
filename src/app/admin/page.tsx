@@ -31,7 +31,7 @@ export default function AdminDashboardPage() {
 
       {attention && attention.total > 0 && <AttentionSummary attention={attention} />}
 
-      <div className="grid-4" style={{ marginBottom: 24 }}>
+      <div className="grid-4 metrics-2up" style={{ marginBottom: 24 }}>
         <MetricCard icon="users" label="Total Teachers" value={teachers} />
         <MetricCard icon="user" label="Total Students" value={students} />
         <MetricCard icon="video" label="Sessions This Month" value={sessionsThisMonth} />
@@ -52,7 +52,7 @@ export default function AdminDashboardPage() {
           {/* Real ledger numbers only. Revenue = pack-linked grants; manual
               no-pack grants carry no price and are shown as a count, never
               guessed at. Payouts appear when the payout report ships. */}
-          <div className="grid-2">
+          <div className="grid-2 pairs-2up">
             <PnlRow
               label="Revenue (pack sales)"
               value={stats ? `${stats.revenueBase.toLocaleString()} ${stats.currency}` : "…"}

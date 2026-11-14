@@ -153,6 +153,11 @@ export function TeacherDetail({ id }: { id: string }) {
               ? `Usual weekly hours: ${availability.activeDays.map((day) => DAYS[day]).join(", ")}`
               : "No weekly availability has been opened yet."}
           </div>
+          {data.policy.teacherMinWeeklyHours > 0 && availability.weeklyHours < data.policy.teacherMinWeeklyHours && (
+            <div className="body-sm" style={{ marginTop: 6, color: "var(--feedback-warning)" }}>
+              {availability.weeklyHours} h open per week — below the {data.policy.teacherMinWeeklyHours} h minimum.
+            </div>
+          )}
           {teacher.meetLink ? (
             <a href={teacher.meetLink} target="_blank" rel="noreferrer" className="link body-sm" style={{ display: "inline-flex", gap: 5, alignItems: "center", marginTop: 10 }}>
               Open permanent meeting room <ExternalLink size={12} />
@@ -224,6 +229,7 @@ export function TeacherDetail({ id }: { id: string }) {
           <InfoRow label="Student no-shows" value={stats.studentNoShows} />
           <InfoRow label="Teacher no-shows" value={stats.teacherNoShows} tone={stats.teacherNoShows > 0 ? "var(--feedback-error)" : undefined} />
           <InfoRow label="Teacher cancellations" value={stats.teacherCancellations} tone={stats.teacherCancellations > 0 ? "var(--feedback-warning)" : undefined} />
+          <InfoRow label={`Materials not published within ${data.policy.lessonPublishHours} h`} value={stats.lateMaterials} tone={stats.lateMaterials > 0 ? "var(--feedback-warning)" : undefined} />
           <InfoRow label="All recorded sessions" value={stats.total} last />
         </div>
       </div>
@@ -242,7 +248,7 @@ export function TeacherDetail({ id }: { id: string }) {
                 </div>
                 {timeOff.approved ? (
                   <span className="pill pill-active"><Check size={12} /> Acknowledged</span>
-                ) : timeOff.days > 3 ? (
+                ) : timeOff.days > data.policy.timeOffApprovalDays ? (
                   <Button size="sm" onClick={() => void approve(timeOff.groupId)}>Acknowledge time off</Button>
                 ) : (
                   <span className="pill pill-new">Academy notified</span>

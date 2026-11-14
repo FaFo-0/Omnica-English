@@ -32,6 +32,8 @@ import {
   StickyNote,
   HelpCircle,
   Clock,
+  MoreHorizontal,
+  MonitorUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -44,13 +46,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { RecordingPanel, type RecordingPanelHandle } from "@/components/recording/RecordingPanel";
-import { MicCheck } from "@/components/recording/MicCheck";
 import { toast } from "sonner";
 import { errText } from "@/lib/convexError";
 import { buildTranscript } from "@/lib/transcript";
 import { buildUtterances } from "@/lib/transcriptAnchors";
 import { readShareWindowState, shareWindowUrl } from "@/lib/shareWindowState";
 import Link from "next/link";
+import { transcriptionLanguageHints } from "../../../../../../convex/lib/transcriptionLanguages";
 
 const INTERACTION_PANEL_W = 480;
 
@@ -66,6 +68,7 @@ export default function LiveLessonPage() {
     if (lesson?.scheduleEventId && joinInfo === null) router.replace(`/teacher/sessions/${id}`);
   }, [lesson?.scheduleEventId, joinInfo, router, id]);
   const me = useQuery(api.users.getMe);
+  const learnerLocale = useQuery(api.users.getLearnerLocale, lesson ? { studentId: lesson.studentId } : "skip");
 
   const [interactionTab, setInteractionTab] = useState("reading");
   const [readingWorkId, setReadingWorkId] =
@@ -125,6 +128,16 @@ export default function LiveLessonPage() {
   const [confirmEndOpen, setConfirmEndOpen] = useState(false);
   const [confirmNoShowOpen, setConfirmNoShowOpen] = useState(false);
   const [confirmBackOpen, setConfirmBackOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  useEffect(() => {
+    if (!moreOpen) return;
+    const close = () => setMoreOpen(false);
+    const timer = setTimeout(() => document.addEventListener("click", close, { once: true }));
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("click", close);
+    };
+  }, [moreOpen]);
 
   // Started by mistake → un-start it. The booking, slot and credit are all
   // left exactly as they were (see lessons.discard).
@@ -257,7 +270,7 @@ export default function LiveLessonPage() {
     setUploadEnding(true);
     toast.success(`File uploaded (${Math.round(durationSec / 60)} min). Transcribing…`);
     try {
-      const result = await transcribeAudioFile({ storageId });
+      const result = await transcribeAudioFile({ storageId, lessonId: id as Id<"lessons"> });
       const tokens = result.tokens;
       const text = buildTranscript(tokens).trim();
       if (!text) {
@@ -403,69 +416,58 @@ export default function LiveLessonPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Always available, at any point in the lesson: presenting the reading
-              or the quiz never depends on being in the right tab. */}
-          <span className="text-xs" style={{ color: "var(--omnic-gray-400)" }}>
-            Present
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => openShareWindow("reading")}
-            title="Open the reading window where you stopped and present it in Meet"
-          >
-            <BookOpen size={13} className="me-1" />
-            Reading
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => openShareWindow("quiz")}
-            title="Open the quiz window at the question you were on"
-          >
-            <Sparkles size={13} className="me-1" />
-            Quiz
-          </Button>
+          {/* Present: open the reading or quiz window to share in Meet, at any
+              point in the lesson. */}
+          <div className="flex items-center rounded-lg border" style={{ borderColor: "var(--omnic-gray-200)" }}>
+            <span className="ps-2.5 pe-1 text-xs" style={{ color: "var(--omnic-gray-500)" }}>
+              <MonitorUp size={13} className="inline me-1" />Present
+            </span>
+            <Button variant="ghost" size="sm" onClick={() => openShareWindow("reading")} title="Open the reading window where you stopped and present it in Meet">
+              <BookOpen size={13} className="me-1" />Reading
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => openShareWindow("quiz")} title="Open the quiz window at the question you were on">
+              <Sparkles size={13} className="me-1" />Quiz
+            </Button>
+          </div>
           {(joinInfo?.url || (!lesson?.scheduleEventId && me?.meetLink)) && (
-            <a
-              href={lesson?.scheduleEventId ? `/join/${lesson.scheduleEventId}` : me?.meetLink}
-              target="_blank"
-              rel="noreferrer"
-              className="btn btn-secondary"
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 12px" }}
+            <Button
+              variant="outline"
+              size="sm"
+              render={<a href={lesson?.scheduleEventId ? `/join/${lesson.scheduleEventId}` : me?.meetLink} target="_blank" rel="noreferrer" />}
             >
-              <ExternalLink size={13} />
-              Go to Google Meet
-            </a>
+              <ExternalLink size={13} className="me-1" />Meet
+            </Button>
           )}
           <Button
             size="sm"
             disabled={endingSession || uploadEnding}
             onClick={() => setConfirmEndOpen(true)}
-            style={{
-              background: "var(--action-danger)",
-              color: "white",
-              border: "none",
-            }}
+            style={{ background: "var(--action-danger)", color: "white", border: "none" }}
           >
             <Square size={13} className="me-1" />
-            {endingSession ? "Ending…" : "End Session"}
+            {endingSession ? "Ending…" : "End session"}
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={noShowBusy}
-            onClick={() => setConfirmNoShowOpen(true)}
-            style={{
-              borderColor: "var(--omnic-red)",
-              color: "var(--omnic-red)",
-              opacity: 0.6,
-            }}
-            title="Wait 10 minutes after scheduled start to mark no-show"
-          >
-            <UserX size={13} className="me-1" />
-            {noShowBusy ? "…" : "No-show"}
-          </Button>
+          <div className="relative">
+            <Button variant="ghost" size="icon" aria-label="More" aria-expanded={moreOpen} onClick={() => setMoreOpen((v) => !v)}>
+              <MoreHorizontal size={16} />
+            </Button>
+            {moreOpen && (
+              <div className="absolute end-0 top-full z-30 mt-1 w-56 rounded-lg border bg-card p-1 shadow-lg" style={{ borderColor: "var(--omnic-gray-100)" }}>
+                <button
+                  type="button"
+                  disabled={noShowBusy}
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-start text-sm hover:bg-muted"
+                  style={{ color: "var(--omnic-red)" }}
+                  onClick={() => {
+                    setMoreOpen(false);
+                    setConfirmNoShowOpen(true);
+                  }}
+                >
+                  <UserX size={14} /> Student didn&apos;t come (no-show)
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -473,11 +475,10 @@ export default function LiveLessonPage() {
       <div className="flex-1 flex overflow-hidden">
         {/* ── Left: Transcription ── */}
         <div
-          className="flex-1 overflow-y-auto border-e"
+          className="flex min-w-0 flex-1 flex-col overflow-hidden border-e"
           style={{ borderColor: "var(--omnic-gray-100)" }}
         >
-          <div className="p-4 max-w-3xl mx-auto">
-            <MicCheck />
+          <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col">
             <RecordingPanel
               ref={recorderRef}
               lessonId={id as Id<"lessons">}
@@ -488,23 +489,10 @@ export default function LiveLessonPage() {
               savedRecordedSeconds={lesson.recordedSeconds ?? 0}
               onRecordedSeconds={setCapturedSeconds}
               onSessionStarted={setSessionStartedAt}
+              languageHints={transcriptionLanguageHints(learnerLocale)}
             />
-            {lesson.transcript && (
-              <div className="mt-6 rounded-xl border bg-card p-4">
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider" style={{ color: "var(--omnic-gray-500)" }}>
-                  Saved transcript
-                </h3>
-                <p className="mb-2 text-xs" style={{ color: "var(--omnic-gray-400)" }}>
-                  Written to the lesson every 20 seconds while recording — leaving
-                  this page keeps it.
-                </p>
-                <pre className="whitespace-pre-wrap text-sm leading-relaxed" style={{ color: "var(--omnic-gray-800)" }}>
-                  {lesson.transcript}
-                </pre>
-              </div>
-            )}
             {uploadEnding && (
-              <div className="mt-6 rounded-xl border bg-card p-4 text-center">
+              <div className="m-4 rounded-xl border bg-card p-4 text-center">
                 <Loader2 size={20} className="mx-auto mb-2 animate-spin" style={{ color: "var(--brand-purple)" }} />
                 <p className="text-sm" style={{ color: "var(--omnic-gray-500)" }}>Transcribing audio…</p>
                 <p className="text-xs mt-1" style={{ color: "var(--omnic-gray-400)" }}>This may take a moment for longer files.</p>
@@ -523,7 +511,7 @@ export default function LiveLessonPage() {
             onValueChange={setInteractionTab}
             className="h-full flex flex-col"
           >
-            <TabsList className="shrink-0 mx-3 mt-3 grid w-auto grid-cols-4 gap-0.5">
+            <TabsList className="shrink-0 mx-3 mt-3 flex w-auto justify-start gap-0.5 overflow-x-auto">
               <TabsTrigger value="reading">
                 <BookOpen size={13} className="me-1" />Reading
               </TabsTrigger>

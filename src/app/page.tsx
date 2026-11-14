@@ -13,8 +13,8 @@ export async function generateMetadata({ searchParams }: { searchParams: Params 
   // card stays brand-first and English (see src/lib/publicShareCard.ts); it must
   // be set explicitly because Next derives og:title from the page title otherwise.
   return {
-    title: `${copy.heroA} ${copy.heroB} — Omnica English`,
-    description: copy.hero,
+    title: `${copy.metaTitle} — Omnica English`,
+    description: copy.metaDescription,
     openGraph: {
       title: PUBLIC_SHARE_CARD.title,
       description: PUBLIC_SHARE_CARD.description,

@@ -57,15 +57,21 @@ export const generateUploadUrl = mutation({
 
 /**
  * After the client uploads the blob, call this to point
- * lessons.audioFileId at the latest complete snapshot. Old audioFileId rows
- * remain in storage for recovery; admin can prune later.
+ * lessons.audioFileId at the latest complete snapshot.
+ *
+ * Each live snapshot is the whole recording so far, so the previous snapshot
+ * of the same recording is deleted once the new one is linked (`supersedes`).
+ * Keeping every copy filled 1.9 GB for ~7 lessons and got the free plan
+ * disabled (2026-11-14). A new recording segment passes no `supersedes`, so
+ * the earlier segment's final file is kept.
  */
 export const setAudioFile = mutation({
   args: {
     lessonId: v.id("lessons"),
     storageId: v.id("_storage"),
+    supersedes: v.optional(v.id("_storage")),
   },
-  handler: async (ctx, { lessonId, storageId }) => {
+  handler: async (ctx, { lessonId, storageId, supersedes }) => {
     const { orgId, user } = await requireTenant(ctx);
     const lesson = await ctx.db.get(lessonId);
     if (!lesson || lesson.organizationId !== orgId) {
@@ -78,5 +84,9 @@ export const setAudioFile = mutation({
       throw new Error("Only the lesson teacher can attach audio");
     }
     await ctx.db.patch(lessonId, { audioFileId: storageId });
+    // Only ever this lesson's own previous snapshot.
+    if (supersedes && supersedes !== storageId && lesson.audioFileId === supersedes) {
+      await ctx.storage.delete(supersedes);
+    }
   },
 });

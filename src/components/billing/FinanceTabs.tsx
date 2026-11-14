@@ -89,7 +89,7 @@ export function FinanceOverview() {
         )}
       </div>
 
-      <div className="grid-3" style={{ marginBottom: 16 }}>
+      <div className="grid-3 totals-2up" style={{ marginBottom: 16 }}>
         <div className="card" style={{ padding: 18 }}>
           <div style={{ fontSize: 26, fontWeight: 700, color: "var(--feedback-success)" }}>
             {money(summary.income, cur)}
@@ -268,7 +268,7 @@ export function PayrollTab() {
       )}
 
       <div className="tbl-wrap">
-        <table className="tbl">
+        <table className="tbl tbl-stack tbl-stack-3">
           <thead>
             <tr>
               <th>Teacher</th>
@@ -283,8 +283,8 @@ export function PayrollTab() {
           <tbody>
             {payroll.rows.map((r: any) => (
               <tr key={r.teacherId}>
-                <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{r.name}</td>
-                <td style={{ whiteSpace: "nowrap" }}>
+                <td data-wide style={{ fontWeight: 700, whiteSpace: "nowrap" }}>{r.name}</td>
+                <td data-label="Rate" style={{ whiteSpace: "nowrap" }}>
                   <button
                     className="btn btn-ghost btn-sm"
                     onClick={() => setRateFor({ teacherId: r.teacherId, name: r.name, rate: r.nativeRate, nativeCurrency: r.nativeCurrency })}
@@ -294,16 +294,16 @@ export function PayrollTab() {
                     {r.rateIsDefault && r.rate > 0 ? " (default)" : ""}
                   </button>
                 </td>
-                <td>{r.lessonsPayable}</td>
-                <td style={{ fontWeight: 700 }}>{r.lessonsUnpaid}</td>
-                <td style={{ fontWeight: 700, whiteSpace: "nowrap" }}>{money(r.amountUnpaid, cur)}</td>
-                <td className="muted" style={{ whiteSpace: "nowrap" }}>
+                <td data-label="Lessons">{r.lessonsPayable}</td>
+                <td data-label="Unpaid" style={{ fontWeight: 700 }}>{r.lessonsUnpaid}</td>
+                <td data-label="Owed" style={{ fontWeight: 700, whiteSpace: "nowrap" }}>{money(r.amountUnpaid, cur)}</td>
+                <td data-label="Paid this month" className="muted" style={{ whiteSpace: "nowrap" }}>
                   {r.amountPaid > 0 ? money(r.amountPaid, cur) : "—"}
                   {r.lastPaidAt && (
                     <div style={{ fontSize: 11 }}>{new Date(r.lastPaidAt).toLocaleDateString()}</div>
                   )}
                 </td>
-                <td style={{ whiteSpace: "nowrap" }}>
+                <td data-actions style={{ whiteSpace: "nowrap" }}>
                   <button
                     className="btn btn-tenant btn-sm"
                     disabled={r.lessonsUnpaid === 0 || r.rate <= 0 || busy === r.teacherId}
@@ -560,7 +560,7 @@ export function ExpensesTab() {
         </div>
 
         <div className="tbl-wrap">
-          <table className="tbl">
+          <table className="tbl tbl-stack">
             <thead>
               <tr>
                 <th>Date</th>
@@ -573,19 +573,19 @@ export function ExpensesTab() {
             <tbody>
               {manualEntries.map((e: any) => (
                 <tr key={e._id}>
-                  <td className="muted" style={{ whiteSpace: "nowrap" }}>{e.date}</td>
-                  <td style={{ whiteSpace: "nowrap" }}>
+                  <td data-label="Date" className="muted" style={{ whiteSpace: "nowrap" }}>{e.date}</td>
+                  <td data-label="Category" style={{ whiteSpace: "nowrap" }}>
                     {CATEGORY_LABELS[e.category] ?? e.category}
                     {e.isEstimate && (
                       <span className="pill pill-new" style={{ fontSize: 10, marginInlineStart: 6 }}>estimate</span>
                     )}
                   </td>
-                  <td style={{ fontWeight: 600, whiteSpace: "nowrap", color: e.direction === "in" ? "var(--feedback-success)" : "var(--feedback-error)" }}>
+                  <td data-label="Amount" style={{ fontWeight: 600, whiteSpace: "nowrap", color: e.direction === "in" ? "var(--feedback-success)" : "var(--feedback-error)" }}>
                     {e.direction === "in" ? "+" : "−"}{money(e.reportAmount ?? e.amountBase, e.reportCurrency ?? e.baseCurrency ?? e.currency)}
                     {e.currency !== (e.reportCurrency ?? e.baseCurrency ?? e.currency) && <div className="body-sm muted">{money(e.amount, e.currency)} · recorded rate {e.fxRate}</div>}
                   </td>
-                  <td className="muted">{e.note ?? "—"}</td>
-                  <td>
+                  <td data-label="Note" data-wide className="muted">{e.note ?? "—"}</td>
+                  <td data-actions>
                     {!e.payrollRunId && (
                       <button
                         className="btn btn-ghost btn-sm"
@@ -838,7 +838,7 @@ export function MoneyLedgerTab() {
   }
   return (
     <div className="tbl-wrap">
-      <table className="tbl">
+      <table className="tbl tbl-stack">
         <thead>
           <tr>
             <th>Date</th>
@@ -853,23 +853,23 @@ export function MoneyLedgerTab() {
         <tbody>
           {entries.map((e: any) => (
             <tr key={e._id}>
-              <td className="muted" style={{ whiteSpace: "nowrap" }}>{e.date}</td>
-              <td style={{ whiteSpace: "nowrap" }}>{CATEGORY_LABELS[e.category] ?? e.category}</td>
-              <td>
+              <td data-label="Date" className="muted" style={{ whiteSpace: "nowrap" }}>{e.date}</td>
+              <td data-label="Category" style={{ whiteSpace: "nowrap" }}>{CATEGORY_LABELS[e.category] ?? e.category}</td>
+              <td data-label="In / out">
                 <span className={`pill ${e.direction === "in" ? "pill-active" : "pill-paused"}`}>
                   {e.direction === "in" ? "in" : "out"}
                 </span>
               </td>
-              <td style={{ fontWeight: 600, whiteSpace: "nowrap", color: e.direction === "in" ? "var(--feedback-success)" : "var(--feedback-error)" }}>
+              <td data-label="Amount" style={{ fontWeight: 600, whiteSpace: "nowrap", color: e.direction === "in" ? "var(--feedback-success)" : "var(--feedback-error)" }}>
                 {e.direction === "in" ? "+" : "−"}{money(e.reportAmount ?? e.amountBase, e.reportCurrency ?? e.baseCurrency ?? e.currency)}
                     {e.currency !== (e.reportCurrency ?? e.baseCurrency ?? e.currency) && <div className="body-sm muted">{money(e.amount, e.currency)} · recorded rate {e.fxRate}</div>}
               </td>
-              <td className="muted">
+              <td data-label="Source" className="muted">
                 {e.source === "auto" ? "automatic" : "manual"}
                 {e.isEstimate ? " · estimate" : ""}
               </td>
-              <td className="muted">{e.note ?? "—"}</td>
-              <td>
+              <td data-label="Note" data-wide className="muted">{e.note ?? "—"}</td>
+              <td data-actions>
                 <button
                   className="btn btn-ghost btn-sm"
                   disabled={Boolean(e.payrollRunId) || deleting === e._id}

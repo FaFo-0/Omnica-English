@@ -1,7 +1,7 @@
 import { preparedWord, preparationState } from "./lib/libraryValidators";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { NOTIFICATION_KINDS } from "./lib/notificationRegistry";
+import { STORED_NOTIFICATION_KINDS } from "./lib/notificationRegistry";
 
 // ── Reusable validators ────────────────────────────────────────────
 const contentSectionStatus = v.union(
@@ -172,6 +172,10 @@ export default defineSchema({
     // only student-chosen start times are constrained. Default 15.
     bookingGranularityMinutes: v.optional(v.number()),
     noShowConsumesLesson: v.boolean(),
+    // Settings → Policy: admin overrides of POLICY_DEFAULTS in
+    // convex/lib/policy.ts. Missing keys use the default.
+    policy: v.optional(v.record(v.string(), v.number())),
+    policyUpdatedAt: v.optional(v.string()),
     // Default flat pay per lesson for teachers without their own rate.
     defaultPayoutPerLesson: v.optional(v.number()),
 
@@ -275,6 +279,9 @@ export default defineSchema({
     tokenIdentifier: v.optional(v.string()),
 
     name: v.string(),
+    // Set once a name is typed in the app (student profile, onboarding, admin
+    // edit). From then on sign-in stops copying the Clerk account name over it.
+    nameSetInApp: v.optional(v.boolean()),
     email: v.string(),
     role: userRole,
     // Preserve the former role and history while removing a person's access.
@@ -316,6 +323,9 @@ export default defineSchema({
     // POLICY §8 — the teacher is on every recording too, so their agreement
     // is stored the same way the student's is: a timestamp, not a boolean.
     recordingConsentAt: v.optional(v.string()),
+    // Last time this person acknowledged a change to the lesson rules
+    // (tenantSettings.policyUpdatedAt). Drives the one-time "rules updated" banner.
+    policySeenAt: v.optional(v.string()),
     phoneWhatsapp: v.optional(v.string()),
     // Parent/guardian for under-18 students (mirrored from onboarding).
     guardianName: v.optional(v.string()),
@@ -327,7 +337,8 @@ export default defineSchema({
     telegramConnectedAt: v.optional(v.string()),
     telegramLinkCode: v.optional(v.string()),
     telegramLinkCodeExpiresAt: v.optional(v.string()),
-    // P7 — "Not now" from the dashboard Telegram prompt (30-day snooze).
+    // Retired 2026-11: the dashboard Telegram prompt was replaced by the
+    // app-install banner. Kept so existing rows stay valid.
     telegramPromptDismissedAt: v.optional(v.string()),
     // H.12 — ICS subscription
     icsToken: v.optional(v.string()),
@@ -371,6 +382,8 @@ export default defineSchema({
     transcript: v.string(),
     // Incremented only when a finalized transcript replaces its structured
     // utterances. Vocabulary occurrences retain the version they came from.
+    // Whole transcript before "Fix English" rewrote it, so Undo is exact.
+    transcriptBeforeEnglishFix: v.optional(v.string()),
     transcriptVersion: v.optional(v.number()),
     summary: v.string(),
     contentStatus: v.object({
@@ -401,6 +414,7 @@ export default defineSchema({
     teacherNotes: v.optional(v.string()),
   })
     .index("by_organization", ["organizationId"])
+    .index("by_organization_and_status", ["organizationId", "status"])
     .index("by_organization_and_externalId", ["organizationId", "externalId"])
     .index("by_organization_and_teacherId", ["organizationId", "teacherId"])
     .index("by_organization_and_studentId", ["organizationId", "studentId"])
@@ -412,6 +426,31 @@ export default defineSchema({
     .index("by_organization_and_isDeleted", ["organizationId", "isDeleted"]),
 
   // ── Lesson content (normalized) ──────────────────────────────────
+  // Student speaking mistakes found in a lesson transcript (AI-suggested,
+  // teacher-reviewed). `quote` is verified verbatim against the utterance; the
+  // student sees only confirmed rows on a published lesson.
+  lessonMistakes: defineTable({
+    organizationId: v.string(),
+    lessonId: v.id("lessons"),
+    studentId: v.string(),
+    utteranceId: v.string(),
+    transcriptVersion: v.optional(v.number()),
+    sentence: v.string(),
+    quote: v.string(),
+    correction: v.string(),
+    category: v.string(),
+    explanationEn: v.string(),
+    explanation: v.string(), // in the student's language
+    explanationLocale: v.string(),
+    startMs: v.optional(v.number()),
+    endMs: v.optional(v.number()),
+    status: v.union(v.literal("suggested"), v.literal("confirmed"), v.literal("rejected")),
+    reviewedBy: v.optional(v.string()),
+    createdAt: v.string(),
+  })
+    .index("by_lessonId", ["lessonId"])
+    .index("by_organization_and_studentId", ["organizationId", "studentId"]),
+
   lessonVocabulary: defineTable({
     organizationId: v.string(),
     lessonId: v.id("lessons"),
@@ -438,6 +477,9 @@ export default defineSchema({
     sourceStartMs: v.optional(v.number()),
     sourceEndMs: v.optional(v.number()),
     sourceTranscriptVersion: v.optional(v.number()),
+    // The exact transcribed form when the English word was written in another
+    // script (Soniox writes "Brazilian" as برازيليان inside Arabic speech).
+    heardAs: v.optional(v.string()),
     // Assigned once when a candidate is created; definition edits must not
     // silently turn one learner word into a second sense/card.
     senseId: v.optional(v.string()),
@@ -460,6 +502,8 @@ export default defineSchema({
     utteranceId: v.string(),
     transcriptVersion: v.number(),
     text: v.string(),
+    // Text as transcribed, kept when "Fix English" rewrote this line (Undo).
+    originalText: v.optional(v.string()),
     speaker: v.optional(v.string()),
     startMs: v.optional(v.number()),
     endMs: v.optional(v.number()),
@@ -984,6 +1028,13 @@ export default defineSchema({
       v.union(v.literal("teacher"), v.literal("student"), v.literal("admin"))
     ),
     cancelledAt: v.optional(v.string()),
+    // `cancelledBy` is whose cancellation it counts as (policy, quota,
+    // reliability). When staff cancelled it for someone else — a teacher
+    // cancelling because the student asked on WhatsApp, or an admin acting for
+    // either side — this records who actually pressed the button.
+    cancelledOnBehalfBy: v.optional(
+      v.union(v.literal("teacher"), v.literal("admin"))
+    ),
     cancellationCharged: v.optional(v.boolean()), // true = lesson burned (late/over-quota)
     rescheduledBy: v.optional(
       v.union(v.literal("teacher"), v.literal("student"), v.literal("admin"))
@@ -1238,6 +1289,8 @@ export default defineSchema({
     referralSource: v.optional(v.string()),
     // POLICY §8 — recording + AI processing consent, stored with its moment.
     consentAcceptedAt: v.optional(v.string()),
+    // Lesson rules (/policy) agreed at signup.
+    policyAcceptedAt: v.optional(v.string()),
     // Set only by the finish mutation — partial step saves leave it empty
     // (2026-09-07 rebuild: the wizard saves each step as the student goes).
     completedAt: v.optional(v.string()),
@@ -1391,11 +1444,26 @@ export default defineSchema({
     .index("by_organization", ["organizationId"])
     .index("by_organization_and_key", ["organizationId", "key"]),
 
+  // One row per device that turned on push notifications. A device belongs
+  // to whoever turned it on last (a shared phone follows the signed-in user).
+  pushSubscriptions: defineTable({
+    organizationId: v.string(),
+    userId: v.string(), // users.externalId
+    endpoint: v.string(),
+    p256dh: v.string(),
+    auth: v.string(),
+    platform: v.optional(v.string()), // "ios" | "android" | "desktop"
+    createdAt: v.string(),
+    lastSeenAt: v.string(),
+  })
+    .index("by_endpoint", ["endpoint"])
+    .index("by_organization_and_userId", ["organizationId", "userId"]),
+
   notifications: defineTable({
     organizationId: v.string(),
     recipientId: v.string(), // user externalId
     // Single source of truth: convex/lib/notificationRegistry.ts.
-    kind: v.union(...NOTIFICATION_KINDS.map((k) => v.literal(k))),
+    kind: v.union(...STORED_NOTIFICATION_KINDS.map((k) => v.literal(k))),
     payload: v.any(),
     link: v.optional(v.string()),
     // Stable source event + recipient key for notifications that must be
@@ -1416,6 +1484,10 @@ export default defineSchema({
     // that is discarded). Withdrawn rows never reach Telegram and are hidden
     // from the in-app bell.
     withdrawnAt: v.optional(v.string()),
+    // Phone/browser push (installed app). Set once the row has been offered
+    // to every device the recipient had; never re-sent after that.
+    pushSentAt: v.optional(v.string()),
+    pushAttemptCount: v.optional(v.number()),
     createdAt: v.string(),
   })
     .index("by_organization", ["organizationId"])

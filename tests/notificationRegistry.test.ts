@@ -19,36 +19,39 @@ test("registry covers every notification kind the platform can emit", () => {
     "reschedule_request",
     "reschedule_resolved",
     "permission_request",
+    "permission_resolved",
     "achievement_unlocked",
-    "invoice",
-    "impersonation",
     "teacher_late_start",
     "teacher_no_show",
+    "student_no_show",
     "makeup_credit_issued",
     "student_assigned",
     "student_unassigned",
+    "teacher_assigned",
+    "student_paused",
     "student_signup",
     "balance_expiring",
+    "balance_low",
+    "student_out_of_lessons",
     "points_granted",
-    "points_refunded",
     "booking_reminder",
     "homework_assigned",
+    "homework_due",
     "homework_submitted",
     "homework_reviewed",
-    "unscheduled_session",
     "session_reminder",
+    "daily_agenda",
+    "study_reminder",
     "lesson_cancelled",
     "lesson_rescheduled",
     "lesson_assigned",
     "teacher_time_off",
-    "lessons_requested",
+    "time_off_approved",
     "billing_order_requested",
     "billing_order_rejected",
     "finance_entry_due",
     "salary_paid",
     "payment_received",
-    "payment_refunded",
-    "payment_failed",
     "one_time_lesson_started",
   ];
   assert.deepEqual([...NOTIFICATION_KINDS].sort(), [...expected].sort());
@@ -70,16 +73,28 @@ const FIXTURES: Record<string, Record<string, unknown>> = {
     unpaid: false,
   },
   teacher_time_off: { teacherName: "Aigerim", fromDate: "2026-09-20", toDate: "2026-09-22", days: 3, needsApproval: true },
-  lesson_cancelled: { by: "student", date: "2026-09-10", startTime: "15:00", charged: false },
+  lesson_cancelled: {
+    audience: "student", by: "teacher", for: "teacher",
+    lessons: [{ date: "2026-09-10", startTime: "15:00", charged: false }],
+  },
+  permission_resolved: { approved: true, action: "calendar.edit.full" },
+  student_no_show: { date: "2026-09-10", startTime: "15:00", charged: true },
+  teacher_assigned: { teacherName: "Aigerim" },
+  student_paused: { studentName: "Zhandos", untilDate: "2026-09-20" },
+  balance_low: { balance: 0 },
+  student_out_of_lessons: { studentName: "Zhandos", studentUserId: "u1" },
+  homework_due: { title: "Essay: my city", homeworkId: "hw1" },
+  daily_agenda: { lessons: [{ startTime: "10:00", studentName: "Zhandos" }], toPublish: 2, toReview: 1 },
+  study_reminder: { dueCards: 12, streak: 4 },
+  time_off_approved: { fromDate: "2026-09-20", toDate: "2026-09-25", days: 6 },
   lesson_rescheduled: { by: "admin", fromDate: "2026-09-10", fromTime: "15:00", toDate: "2026-09-12", toTime: "16:00" },
   session_reminder: { when: "1h", title: "Business English", date: "2026-09-06", startTime: "15:00" },
   teacher_no_show: { title: "Grammar", teacherName: "Aigerim", refunded: true },
   teacher_late_start: { title: "Grammar", teacherName: "Aigerim", refunded: false },
-  unscheduled_session: { teacherName: "Aigerim", title: "Phrasal verbs" },
   homework_assigned: { title: "Essay: my city", homeworkId: "hw1" },
   homework_submitted: { title: "Essay: my city", lessonId: "lesson1" },
   homework_reviewed: { title: "Essay: my city", homeworkId: "hw1" },
-  booking_reminder: { reason: "no_balance", date: "2026-09-12" },
+  booking_reminder: { reason: "pause_ended" },
   makeup_credit_issued: {},
   student_assigned: { studentName: "Zhandos" },
   student_unassigned: { studentName: "Zhandos" },
@@ -87,17 +102,11 @@ const FIXTURES: Record<string, Record<string, unknown>> = {
   reschedule_resolved: { approved: true },
   permission_request: { reason: "A teacher asked to edit the calendar." },
   session_published: { title: "My first lesson", lessonId: "lesson1" },
-  lessons_requested: { studentName: "Zhandos", packName: "10 lessons", lessons: 10, note: "urgent" },
   payment_received: { studentName: "Zhandos", packName: "10 lessons", lessons: 10, balanceAfter: 12 },
-  payment_refunded: { orderId: "ord1", amount: 100, currency: "USD", lessons: 8 },
-  payment_failed: { message: "Amount mismatch" },
   finance_entry_due: { label: "Internet", period: "September", expectedAmount: 15000, currency: "KZT" },
   salary_paid: { amount: 45000, currency: "KZT", lessons: 10, month: "September" },
   achievement_unlocked: { name: "First lesson" },
-  invoice: { reason: "September invoice" },
-  impersonation: { reason: "An admin signed in on your behalf." },
   points_granted: { points: 10, reason: "makeup" },
-  points_refunded: { reason: "cancelled lesson" },
 };
 
 test("every kind renders a non-empty title and body for a representative payload", () => {
@@ -186,4 +195,11 @@ test("unknown kinds fall back safely instead of crashing the bell", () => {
   const view = notificationView("made_up_kind", { reason: "legacy row" });
   assert.equal(view.title, "Made up kind");
   assert.equal(view.body, "legacy row");
+});
+// A staff-booked lesson plan sends one notification for all its lessons.
+test("lesson_assigned names the lesson count for a booked plan", () => {
+  const plan = notificationView("lesson_assigned", { by: "teacher", date: "2026-11-16", startTime: "18:00", count: 8 });
+  assert.match(plan.body, /booked 8 lessons, starting/);
+  const single = notificationView("lesson_assigned", { by: "teacher", date: "2026-11-16", startTime: "18:00" });
+  assert.match(single.body, /booked a lesson/);
 });

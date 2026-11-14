@@ -38,7 +38,9 @@ function escapeRegExp(value: string): string {
  */
 function containsCompleteSurface(text: string, surface: string): boolean {
   const escapedPhrase = escapeRegExp(surface).replace(/\s+/g, "\\s+");
-  return new RegExp(`\\b${escapedPhrase}\\b`, "i").test(text);
+  // Unicode-aware word edges: `\b` only knows ASCII, so it never matched an
+  // English word transcribed in Arabic letters (e.g. برازيليان).
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escapedPhrase}(?![\\p{L}\\p{N}])`, "iu").test(text);
 }
 
 /**
@@ -123,4 +125,26 @@ export function findTranscriptVocabularyUtterance<T extends PersistedTranscriptU
   return [...utterances]
     .sort((a, b) => (a.startMs ?? Number.MAX_SAFE_INTEGER) - (b.startMs ?? Number.MAX_SAFE_INTEGER) || a.utteranceId.localeCompare(b.utteranceId))
     .find(utterance => containsCompleteSurface(utterance.text, normalized));
+}
+
+/**
+ * Teacher notes are the strongest vocabulary signal, but a note-only word has
+ * no recorded sentence. Accept a generated note-only word only when the teacher
+ * actually wrote it, and give it a stable ID so regeneration stays idempotent.
+ */
+export function noteVocabularyCandidateId(
+  lessonExternalId: string,
+  surface: string,
+  teacherNotes: string | undefined
+): string | undefined {
+  const normalized = normalizeSurface(surface);
+  if (!normalized || !teacherNotes?.trim()) return undefined;
+  if (!containsCompleteSurface(teacherNotes, normalized)) return undefined;
+  return `${lessonExternalId}::notes::${normalized}`;
+}
+
+/** Whether `surface` occurs as a complete word or phrase in `text`. */
+export function utteranceContainsSurface(text: string, surface: string): boolean {
+  const normalized = normalizeSurface(surface);
+  return !!normalized && containsCompleteSurface(text, normalized);
 }

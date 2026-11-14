@@ -115,10 +115,13 @@ export const completeStudentOnboarding = mutation({
   args: {
     // Consent lives here, not in the per-step saves.
     consent: v.boolean(),
+    // Lesson rules (/policy). Optional only so a client cached from before
+    // the checkbox existed can still finish; current clients always send it.
+    policyAccepted: v.optional(v.boolean()),
     ...stepFields,
   },
   handler: async (ctx, rawArgs) => {
-    const { consent, ...args } = rawArgs;
+    const { consent, policyAccepted, ...args } = rawArgs;
     const { orgId, user } = await requireTenant(ctx);
     if (user.role !== "student") {
       throw new Error("Only students complete student onboarding");
@@ -138,6 +141,10 @@ export const completeStudentOnboarding = mutation({
       );
     }
 
+    if (policyAccepted === false) {
+      throw new Error("Please read and agree to the lesson rules to continue.");
+    }
+
     // Upsert the onboarding row (idempotent — student can re-edit).
     const existing = await ctx.db
       .query("studentOnboarding")
@@ -155,6 +162,7 @@ export const completeStudentOnboarding = mutation({
     await upsertOnboardingRow(ctx, orgId, user.externalId, {
       ...fields,
       consentAcceptedAt: existing?.consentAcceptedAt ?? now,
+      ...(policyAccepted ? { policyAcceptedAt: existing?.policyAcceptedAt ?? now } : {}),
       completedAt: now,
     });
 
@@ -163,6 +171,7 @@ export const completeStudentOnboarding = mutation({
     await ctx.db.patch(user._id, {
       onboardingComplete: true,
       name: args.name.trim(),
+      nameSetInApp: true,
       ...(args.phoneWhatsapp ? { phoneWhatsapp: args.phoneWhatsapp } : {}),
       ...(args.guardianName ? { guardianName: args.guardianName } : {}),
       ...(args.guardianPhone ? { guardianPhone: args.guardianPhone } : {}),

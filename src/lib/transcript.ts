@@ -19,13 +19,16 @@ export interface TranscriptToken {
  * deriving roles from finals keeps the mapping stable across updates.
  */
 export function buildSpeakerLabels(
-  tokens: TranscriptToken[]
+  tokens: TranscriptToken[],
+  /** Soniox speaker the teacher identified as their own voice, if any. */
+  teacherSpeaker?: string | null
 ): Map<string, string> {
   const map = new Map<string, string>();
   let studentCount = 0;
+  if (teacherSpeaker) map.set(teacherSpeaker, "Teacher");
   const assign = (speaker: string) => {
     if (map.has(speaker)) return;
-    if (map.size === 0) {
+    if (map.size === 0 && !teacherSpeaker) {
       map.set(speaker, "Teacher");
     } else {
       studentCount++;
@@ -38,7 +41,7 @@ export function buildSpeakerLabels(
 }
 
 /** Build plain-text transcript with Teacher/Student speaker labels from tokens. */
-export function buildTranscript(tokens: TranscriptToken[]): string {
+export function buildTranscript(tokens: TranscriptToken[], teacherSpeaker?: string | null): string {
   const final = tokens.filter((t) => t.isFinal);
   if (final.length === 0) return "";
 
@@ -46,7 +49,7 @@ export function buildTranscript(tokens: TranscriptToken[]): string {
   const hasSpeakers = final.some((t) => t.speaker);
   if (!hasSpeakers) return final.map((t) => t.text).join("");
 
-  const labels = buildSpeakerLabels(tokens);
+  const labels = buildSpeakerLabels(tokens, teacherSpeaker);
 
   // Group consecutive tokens by speaker
   const segments: { speaker: string; text: string }[] = [];

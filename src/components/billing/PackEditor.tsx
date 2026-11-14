@@ -137,7 +137,7 @@ function OrderCard({ order, busy, onGrant, onReject, onDelete }: { order: OrderR
       <div style={{ display: "flex", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
         <div style={{ minWidth: 0, flex: "1 1 240px", overflowWrap: "anywhere" }}>
           <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
-            <strong>{order.buyerName}</strong><span className="body-sm">{order.buyerStudentId}</span>
+            <strong>{order.buyerName}</strong>
           </div>
           <div className="body-sm" style={{ marginTop: 6 }}>{order.planSnapshot.familyLabel} · {order.planSnapshot.planLabel}</div>
           <div className="body-sm" style={{ marginTop: 4 }}>{t("lessonEntitlement")}: {order.planSnapshot.lessonCount} · {t("expiryDays")}: {order.planSnapshot.expiryDays}</div>
@@ -206,6 +206,8 @@ export function PackEditor() {
   const rejectOrder = useMutation(api.pricing.rejectOrder);
   const deleteOrphanedOrder = useMutation(api.pricing.deleteOrphanedOrder);
   const grantLessons = useMutation(api.pricing.grantLessonsToStudent);
+  // Pick the student by name/email; the internal account ID never reaches the admin.
+  const studentOptions = useQuery(api.pricing.getAdminOrderOptions, { currency: "USD" });
 
   const families = (catalogue?.families ?? []) as unknown as FamilyRow[];
   const packs = (catalogue?.packs ?? []) as unknown as PackRow[];
@@ -331,7 +333,7 @@ export function PackEditor() {
                     isVisible: family.isVisible,
                     showOnWebsite: family.showOnWebsite !== false,
                   })}>{t("edit")}</Button>
-                  <details className="relative"><summary className="btn cursor-pointer">More</summary><div className="absolute z-20 end-0 mt-1 min-w-44 rounded-xl border bg-white p-2 shadow-lg grid gap-1"><Button size="sm" variant="outline" disabled={busy} onClick={() => void run(() => duplicateFamily({ familyId: family._id as never }), "Family duplicated (hidden)")}>Duplicate family</Button><Button size="sm" variant="destructive" disabled={busy} onClick={() => { if (confirm(`Delete ${family.label} and its ${familyPacks.length} packs? Existing orders and payments are kept.`)) void run(() => deleteFamily({familyId: family._id as never}), "Family deleted"); }}>Delete family</Button></div></details>
+                  <details className="relative"><summary className="inline-flex h-7 cursor-pointer list-none items-center rounded-[min(var(--radius-md),12px)] border border-border bg-background px-2.5 text-[0.8rem] font-medium hover:bg-muted [&::-webkit-details-marker]:hidden">More</summary><div className="absolute z-20 end-0 mt-1 min-w-44 rounded-xl border bg-popover p-2 shadow-lg grid gap-1"><Button size="sm" variant="outline" disabled={busy} onClick={() => void run(() => duplicateFamily({ familyId: family._id as never }), "Family duplicated (hidden)")}>Duplicate family</Button><Button size="sm" variant="destructive" disabled={busy} onClick={() => { if (confirm(`Delete ${family.label} and its ${familyPacks.length} packs? Existing orders and payments are kept.`)) void run(() => deleteFamily({familyId: family._id as never}), "Family deleted"); }}>Delete family</Button></div></details>
                   <Button size="sm" variant="outline" disabled={busy} onClick={() => void run(() => setFamilyVisible({ familyId: family._id as never, isVisible: !family.isVisible }), t("saved"))}>
                     {family.isVisible ? t("hide") : t("show")}
                   </Button>
@@ -411,7 +413,10 @@ export function PackEditor() {
         <h2 className="h2" style={{ margin: 0 }}>{t("grantLessons")}</h2>
         <p className="body-sm" style={{ marginTop: 4 }}>{t("giveLessonsHint")}</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8, marginTop: 12 }}>
-          <Input placeholder={t("studentId")} value={give.studentId} onChange={(event) => setGive({ ...give, studentId: event.target.value })} />
+          <select className="input" aria-label={t("studentId")} value={give.studentId} onChange={(event) => setGive({ ...give, studentId: event.target.value })} disabled={!studentOptions}>
+            <option value="">{studentOptions ? "Choose a student" : "Loading students…"}</option>
+            {studentOptions?.students.map((student) => <option key={student.studentId} value={student.studentId}>{student.name}{student.email ? ` · ${student.email}` : ""}</option>)}
+          </select>
           <Input type="number" min="1" placeholder={t("lessonsCount")} value={give.lessons} onChange={(event) => setGive({ ...give, lessons: event.target.value })} />
           <Input type="number" min="1" placeholder={t("validForDays", { days: "60" })} value={give.expiryDays} onChange={(event) => setGive({ ...give, expiryDays: event.target.value })} />
           <Input type="number" min="0" placeholder={t("amount")} value={give.amount} onChange={(event) => setGive({ ...give, amount: event.target.value })} />
@@ -518,7 +523,7 @@ function PackRowView({ pack, busy, onEdit, onMove, onToggleVisible, onToggleArch
         <Button size="sm" variant="outline" aria-label={t("moveDown")} disabled={busy} onClick={() => onMove(1)}>↓</Button>
         <Button size="sm" variant="outline" onClick={onEdit}>{t("edit")}</Button>
         <Button size="sm" variant="outline" disabled={busy} onClick={onToggleVisible}>{pack.isVisible ? t("hide") : t("show")}</Button>
-        <Button size="sm" variant="outline" disabled={busy} onClick={onToggleArchived}>{pack.isArchived ? t("restore") : t("archive")}</Button><details className="relative"><summary className="btn cursor-pointer">More</summary><div className="absolute z-20 end-0 mt-1 min-w-36 rounded-xl border bg-white p-2 shadow-lg grid gap-1"><Button size="sm" variant="outline" disabled={busy} onClick={onDuplicate}>Duplicate</Button><Button size="sm" variant="destructive" disabled={busy} onClick={onDelete}>Delete</Button></div></details>
+        <Button size="sm" variant="outline" disabled={busy} onClick={onToggleArchived}>{pack.isArchived ? t("restore") : t("archive")}</Button><details className="relative"><summary className="inline-flex h-7 cursor-pointer list-none items-center rounded-[min(var(--radius-md),12px)] border border-border bg-background px-2.5 text-[0.8rem] font-medium hover:bg-muted [&::-webkit-details-marker]:hidden">More</summary><div className="absolute z-20 end-0 mt-1 min-w-36 rounded-xl border bg-popover p-2 shadow-lg grid gap-1"><Button size="sm" variant="outline" disabled={busy} onClick={onDuplicate}>Duplicate</Button><Button size="sm" variant="destructive" disabled={busy} onClick={onDelete}>Delete</Button></div></details>
       </div>
     </div>
   );

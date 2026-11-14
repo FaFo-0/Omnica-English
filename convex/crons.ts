@@ -32,6 +32,15 @@ crons.interval(
   {}
 );
 
+// Phone push for the installed app: same outbox idea as Telegram. The check
+// runs in the cheap runtime and only wakes the sender when something is due.
+crons.interval(
+  "deliver push notifications",
+  { minutes: 1 },
+  internal.push.kick,
+  {}
+);
+
 // §13.2 — retired 2026-09-07: the finite Repeat-this-week inside
 // calendar.confirmBookingBatch replaced the open-ended materializer. The
 // pause auto-resume still runs BEFORE any per-student slot work.
@@ -52,5 +61,9 @@ crons.cron(
 );
 
 crons.interval("resume vocabulary preparation", { minutes: 15 }, internal.libraryPreparation.resumeQueue, {});
+
+// Daily nudges (teacher agenda, study reminder, homework due, out of
+// lessons). Hourly so each lands at the right hour in the recipient's zone.
+crons.interval("notification digests", { hours: 1 }, internal.notificationDigests.hourly, {});
 
 export default crons;

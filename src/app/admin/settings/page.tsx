@@ -7,6 +7,7 @@ import { api } from "@convex";
 import { Icon } from "@/components/shared/icons";
 import { toast } from "sonner";
 import { CurrencySettings } from "@/components/billing/CurrencySettings";
+import { PolicySettings } from "@/components/policy/PolicySettings";
 import { userHasPermission } from "../../../../convex/lib/permissions";
 
 export default function AdminSettingsPage() {
@@ -26,6 +27,7 @@ export default function AdminSettingsPage() {
       </div>
 
       <BrandingSection settings={settings} update={updateSettings} />
+      {me && userHasPermission(me, "scheduling.edit") && <PolicySettings />}
       {me?.role === "admin" && userHasPermission(me, "billing.edit") && <CurrencySettings />}
       <TeacherInviteSection />
       <AIManagerSection
@@ -35,7 +37,6 @@ export default function AdminSettingsPage() {
         refreshAiModels={refreshAiModels}
       />
       <AchievementsSection achievements={achievements} remove={removeAchievement} />
-      <SchedulingSection />
     </div>
   );
 }
@@ -155,6 +156,8 @@ function TeacherInviteSection() {
 function BrandingSection({ settings, update }: { settings: any; update: any }) {
   const [name, setName] = useState("");
   const [primary, setPrimary] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [telegram, setTelegram] = useState("");
   const [features, setFeatures] = useState({
     gamification: true,
     achievements: true,
@@ -166,13 +169,19 @@ function BrandingSection({ settings, update }: { settings: any; update: any }) {
     if (!settings) return;
     setName(settings.name ?? "");
     setPrimary(settings.primaryColor ?? "#6716A4");
+    setWhatsapp(settings.supportWhatsappUrl ?? "");
+    setTelegram(settings.supportTelegramUrl ?? "");
     if (settings.features) setFeatures({ ...features, ...settings.features });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings?._id]);
 
   async function save() {
+    const wa = whatsapp.trim();
+    const tg = telegram.trim();
+    if (wa && !/^https:\/\/wa\.me\/\S+$/.test(wa)) { toast.error("WhatsApp link must start with https://wa.me/"); return; }
+    if (tg && !/^https:\/\/t\.me\/\S+$/.test(tg)) { toast.error("Telegram link must start with https://t.me/"); return; }
     try {
-      await update({ patch: { name, primaryColor: primary, features } });
+      await update({ patch: { name, primaryColor: primary, features, supportWhatsappUrl: wa || undefined, supportTelegramUrl: tg || undefined } });
       toast.success("Branding saved");
     } catch (e) {
       toast.error((e as Error).message);
@@ -205,6 +214,15 @@ function BrandingSection({ settings, update }: { settings: any; update: any }) {
         {/* Only a stored upload counts as "the tenant's logo" — the seeded
             logoUrl points at a repo asset, same as the bundled mark. */}
         <LogoUploader logoUrl={settings?.logoStorageId ? settings.logoUrl : null} />
+        <div>
+          <label className="label" style={{ display: "block", marginBottom: 4 }}>WhatsApp link</label>
+          <input className="input" dir="ltr" inputMode="url" placeholder="https://wa.me/77001234567" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} />
+          <p className="body-sm" style={{ marginTop: 4, color: "var(--omnic-gray-400)" }}>Use the number form (wa.me/7…) so the website can pre-type messages.</p>
+        </div>
+        <div>
+          <label className="label" style={{ display: "block", marginBottom: 4 }}>Telegram link</label>
+          <input className="input" dir="ltr" inputMode="url" placeholder="https://t.me/your_name" value={telegram} onChange={(e) => setTelegram(e.target.value)} />
+        </div>
       </div>
       <div style={{ marginTop: 16 }}>
         <label className="label" style={{ display: "block", marginBottom: 8 }}>Feature Toggles</label>
@@ -803,62 +821,5 @@ function AchievementDialog({ achievement, onClose }: { achievement: any | null; 
         </button>
       </div>
     </Modal>
-  );
-}
-
-// ── Scheduling ───────────────────────────────────────────────────────
-
-function SchedulingSection() {
-  const policy = useQuery(api.policyConstants.get, {});
-
-  // Everything below is compiled into convex/lib/policy.ts from POLICY.md —
-  // shown so the page reports the rules the server really applies. Changing
-  // one means editing POLICY.md, not a field here.
-  const fixed: [string, string][] = policy
-    ? [
-        ["Student cancellation notice", `${policy.studentCancelNoticeHours} h`],
-        ["Free student cancellations", `${policy.studentFreeCancelsPer30Days} per 30 days`],
-        ["Teacher cancellation notice", `${policy.teacherCancelNoticeHours} h`],
-        ["Student cancel / move", "Any future lesson"],
-        ["Teacher cancel / move horizon", `${policy.actionHorizonDays} days ahead`],
-        ["Student booking notice", `${policy.bookingMinNoticeHours} h`],
-        ["Booking horizon", "Through the end of the following academy month"],
-        ["Reservation / teaching", `${policy.reservationMinutes} / ${policy.teachingMinutes} min`],
-        ["Scheduling grid", `${policy.bookingGranularityMinutes} min · back-to-back allowed`],
-        ["No-show wait", `${policy.noShowWaitMinutes} min (ping at ${policy.noShowPingMinutes})`],
-        ["Time off needing sign-off", `longer than ${policy.timeOffApprovalDays} days`],
-      ]
-    : [];
-
-  return (
-    <div className="card" id="scheduling" style={{ padding: 24 }}>
-      <div className="h3" style={{ marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
-        <Icon name="clock" size={18} stroke="var(--omnic-tenant-primary)" /> Scheduling Policies
-      </div>
-      <p className="body-sm" style={{ marginBottom: 16 }}>Current scheduling rules · adjacent lessons are allowed</p>
-
-      <div className="card" style={{ padding: 16, background: "var(--omnic-gray-50)" }}>
-        <div className="h3" style={{ fontSize: 14, marginBottom: 4 }}>Set by POLICY, not here</div>
-        <p className="body-sm" style={{ marginBottom: 10 }}>
-          Cancellation, no-show and booking rules are the same for every tenant
-          and live in POLICY.md. These are the values the server enforces today.
-        </p>
-        {policy === undefined ? (
-          <div className="body-sm">Loading…</div>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "6px 20px" }}>
-            {fixed.map(([label, value]) => (
-              <div
-                key={label}
-                style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "6px 0" }}
-              >
-                <span className="body-sm">{label}</span>
-                <strong style={{ fontSize: 13, whiteSpace: "nowrap" }}>{value}</strong>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
   );
 }

@@ -369,6 +369,80 @@ export const listForLesson = query({
   },
 });
 
+/** Who to message when the teacher shares an assigned homework on WhatsApp. */
+export const shareTarget = query({
+  args: { homeworkId: v.id("homework") },
+  handler: async (ctx, { homeworkId }) => {
+    const { orgId, user } = await requireTenant(ctx);
+    const row = await ctx.db.get(homeworkId);
+    if (!row || row.organizationId !== orgId) return null;
+    if (user.role !== "admin" && !(user.role === "teacher" && row.teacherId === user.externalId)) return null;
+    const student = await ctx.db.query("users")
+      .withIndex("by_organization_and_externalId", (q) => q.eq("organizationId", orgId).eq("externalId", row.studentId))
+      .unique();
+    if (!student) return null;
+    const profile = await ctx.db.query("studentProfiles")
+      .withIndex("by_organization_and_studentId", (q) => q.eq("organizationId", orgId).eq("studentId", row.studentId))
+      .unique();
+    const onboarding = await ctx.db.query("studentOnboarding")
+      .withIndex("by_organization_and_studentId", (q) => q.eq("organizationId", orgId).eq("studentId", row.studentId))
+      .unique();
+    const phone = profile
+      ? `${profile.phoneCountryCode} ${profile.phoneNumber}`.trim()
+      : (student.phoneWhatsapp ?? onboarding?.phoneWhatsapp ?? null);
+    return { locale: student.locale ?? null, phone };
+  },
+});
+
+/**
+ * Every student's homework in one list for the teacher (admin: the whole
+ * academy), without the worksheet bodies. Powers /teacher/homework.
+ */
+export const listForTeacher = query({
+  args: {},
+  handler: async (ctx) => {
+    const { orgId, user } = await requireTenant(ctx);
+    if (user.role !== "teacher" && user.role !== "admin") return [];
+    const rows = user.role === "admin"
+      ? await ctx.db.query("homework").withIndex("by_organization", (q) => q.eq("organizationId", orgId)).order("desc").take(500)
+      : await ctx.db.query("homework")
+          .withIndex("by_organization_and_teacherId", (q) => q.eq("organizationId", orgId).eq("teacherId", user.externalId))
+          .order("desc").take(500);
+    const names = new Map<string, string>();
+    const titles = new Map<string, string>();
+    const out = [];
+    for (const row of rows) {
+      if (!names.has(row.studentId)) {
+        const student = await ctx.db.query("users")
+          .withIndex("by_organization_and_externalId", (q) => q.eq("organizationId", orgId).eq("externalId", row.studentId)).unique();
+        names.set(row.studentId, student?.name ?? "Student");
+      }
+      if (row.lessonId && !titles.has(row.lessonId)) {
+        const lesson = await ctx.db.get(row.lessonId);
+        titles.set(row.lessonId, lesson && !lesson.isDeleted ? lesson.title : "");
+      }
+      if (row.lessonId && titles.get(row.lessonId) === "") continue; // lesson deleted
+      out.push({
+        _id: row._id,
+        lessonId: row.lessonId ?? null,
+        lessonTitle: row.lessonId ? titles.get(row.lessonId)! : null,
+        studentId: row.studentId,
+        studentName: names.get(row.studentId)!,
+        title: row.title,
+        status: row.status,
+        approved: !!row.approvedAt,
+        dueAt: row.dueAt ?? null,
+        submittedAt: row.submittedAt ?? null,
+        reviewedAt: row.reviewedAt ?? null,
+        score: row.score ?? null,
+        maxScore: row.maxScore ?? null,
+        createdAt: row.createdAt,
+      });
+    }
+    return out;
+  },
+});
+
 export const listForStudent = query({
   args: { studentId: v.optional(v.string()) },
   handler: async (ctx, { studentId }) => {
@@ -621,7 +695,9 @@ export async function assignApprovedForLesson(
   ctx: MutationCtx,
   orgId: string,
   lessonId: Id<"lessons">,
-  studentId: string
+  studentId: string,
+  /** Publish announces homework inside its "materials ready" notice. */
+  options: { notify?: boolean } = {}
 ): Promise<number> {
   const rows = await ctx.db
     .query("homework")
@@ -643,14 +719,16 @@ export async function assignApprovedForLesson(
       ...deadline,
       updatedAt: now,
     });
-    await ctx.db.insert("notifications", {
-      organizationId: orgId,
-      recipientId: studentId,
-      kind: "homework_assigned",
-      payload: { homeworkId: row._id, title: row.title, dueAt: due },
-      link: `/student/homework/${row._id}`,
-      createdAt: now,
-    });
+    if (options.notify !== false) {
+      await ctx.db.insert("notifications", {
+        organizationId: orgId,
+        recipientId: studentId,
+        kind: "homework_assigned",
+        payload: { homeworkId: row._id, title: row.title, dueAt: due },
+        link: `/student/homework/${row._id}`,
+        createdAt: now,
+      });
+    }
     sent++;
   }
   return sent;

@@ -4,9 +4,11 @@ import { useRef, useEffect } from "react";
 
 interface WaveformVisualizerProps {
   analyserNode: AnalyserNode | null;
+  /** Small inline meter for the control bar. */
+  compact?: boolean;
 }
 
-export function WaveformVisualizer({ analyserNode }: WaveformVisualizerProps) {
+export function WaveformVisualizer({ analyserNode, compact = false }: WaveformVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
 
@@ -62,9 +64,9 @@ export function WaveformVisualizer({ analyserNode }: WaveformVisualizerProps) {
   return (
     <canvas
       ref={canvasRef}
-      width={400}
-      height={60}
-      className="w-full max-w-md text-primary"
+      width={compact ? 160 : 400}
+      height={compact ? 24 : 60}
+      className={compact ? "h-6 w-40 text-primary" : "w-full max-w-md text-primary"}
       style={{ color: "var(--color-primary)" }}
     />
   );

@@ -150,7 +150,7 @@ const OMNICA_ENGLISH_DEFAULTS = {
   logoDarkUrl: "/brand/tenant/logo-dark.svg",
   faviconUrl: "/brand/tenant/favicon.svg",
   supportEmail: "hello@omnica.app",
-  supportWhatsappUrl: "https://wa.me/message/7M72VAH5Z4Z4C1",
+  supportWhatsappUrl: "https://wa.me/77066993942",
   websiteUrl: "https://omnica.app",
 
   primaryColor: "#6716A4",
@@ -198,9 +198,14 @@ export const getActive = query({
       .withIndex("by_organization", (q) => q.eq("organizationId", ACADEMY_ID))
       .unique();
     if (!settings) return null;
+    // Every signed-in user (students too) reads this. The invite token lets
+    // anyone join as a teacher, so it never leaves the server here; admins
+    // read it through getTeacherInviteToken.
+    const { teacherInviteToken: _inviteToken, ...visible } = settings;
+    void _inviteToken;
     // Backfill Phase-H optional fields for rows seeded pre-H.
     return {
-      ...settings,
+      ...visible,
       supportWhatsappUrl: settings.supportWhatsappUrl ?? OMNICA_ENGLISH_DEFAULTS.supportWhatsappUrl,
       activityTypes: settings.activityTypes ?? DEFAULT_ACTIVITY_TYPES,
       trialPolicy: DEFAULT_TRIAL_POLICY,
@@ -235,18 +240,6 @@ export const getPublicLaunchInfo = query({
         durationDays: trial.durationDays,
       },
     };
-  },
-});
-
-export const getByOrgId = query({
-  args: { organizationId: v.string() },
-  handler: async (ctx, { organizationId }) => {
-    return await ctx.db
-      .query("tenantSettings")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", organizationId)
-      )
-      .unique();
   },
 });
 

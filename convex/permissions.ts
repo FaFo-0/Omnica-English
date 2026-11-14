@@ -88,12 +88,13 @@ export const resolvePermission = mutation({
     await ctx.runMutation(internal.notifications._notify, {
       organizationId: orgId,
       recipientId: req.teacherId,
-      kind: "reschedule_resolved",
+      kind: "permission_resolved",
       payload: {
         requestId,
         action: req.action,
-        decision: status,
+        approved: status === "approved",
       },
+      link: "/teacher",
     });
   },
 });

@@ -11,6 +11,7 @@ export const STUDENT_SIDEBAR: SidebarSection[] = [
       { key: "calendar", href: "/student/calendar", label: "Calendar", icon: "calendar" },
       { key: "achievements", href: "/student/achievements", label: "Achievements", icon: "trophy", feature: "achievements" },
       { key: "packs", href: "/student/billing", label: "Lessons & packs", icon: "dollar" },
+      { key: "rules", href: "/student/policy", label: "Rules", icon: "info" },
     ],
   },
 ];

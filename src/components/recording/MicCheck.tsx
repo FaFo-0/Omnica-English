@@ -122,23 +122,30 @@ export function MicCheck() {
     void startTest(undefined);
   }
 
+  // A small button in the recorder's control bar; the check opens as a
+  // floating panel so it never pushes the transcript down.
   return (
-    <div
-      className="rounded-xl border bg-card p-3 mb-3"
-      style={{ borderColor: "var(--omnic-gray-150, var(--omnic-gray-200))" }}
-    >
-      {!open ? (
-        <button
-          className="btn btn-secondary btn-sm w-full"
-          onClick={() => {
-            setOpen(true);
-            void startTest(deviceId || undefined);
-          }}
+    <div className="relative">
+      <button
+        className="btn btn-secondary btn-sm"
+        aria-expanded={open}
+        onClick={() => {
+          if (open) {
+            setOpen(false);
+            stopAll();
+            return;
+          }
+          setOpen(true);
+          void startTest(deviceId || undefined);
+        }}
+      >
+        <Icon name="mic" size={13} /> {t("check")}
+      </button>
+      {open && (
+        <div
+          className="absolute end-0 top-full z-30 mt-2 w-80 max-w-[90vw] space-y-3 rounded-xl border bg-card p-3 shadow-lg"
+          style={{ borderColor: "var(--omnic-gray-150, var(--omnic-gray-200))" }}
         >
-          <Icon name="mic" size={13} /> {t("check")}
-        </button>
-      ) : (
-        <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="body-sm" style={{ fontWeight: 600 }}>
               {t("title")}

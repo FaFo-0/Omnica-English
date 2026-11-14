@@ -30,7 +30,7 @@ import {
   type ProjectedCalendarSlot,
 } from "@/lib/calendarSlots";
 import { CalendarAvailabilityEdits, type AvailabilityEdit } from "@/lib/calendarAvailabilityEdits";
-import { zonedToInstant, instantToZoned } from "@/lib/tz";
+import { zonedToInstant, instantToZoned, convertZoned } from "@/lib/tz";
 import { sessionStartWindow } from "@/lib/sessionStart";
 import { errText } from "@/lib/convexError";
 import { formatTime } from "@/lib/timeFormat";
@@ -60,6 +60,8 @@ export function StaffCalendar({
 }) {
   const availabilityText = useTranslations("components.calendar.availabilityActions");
   const me = useQuery(api.users.getMe);
+  const livePolicy = useQuery(api.policyConstants.get, {});
+  const rulesHref = me?.role === "teacher" ? "/teacher/guide#rules" : "/admin/settings#policy";
   const [viewerTz, setViewerTz] = useViewerTz(me?.timezone);
   const [clock, setClock] = useTimeFormat(me?.timeFormat);
   const [selectedDate, setDate] = useState<Date | null>(() => initialDate ?? null);
@@ -87,6 +89,11 @@ export function StaffCalendar({
   const [target, setTarget] = useState<ProjectedCalendarSlot | null>(null);
   const [adding, setAdding] = useState(false);
   const [studentId, setStudentId] = useState("");
+  // Lesson plan: the weekly times picked for the student, optionally repeated
+  // weekly until a date (viewer timezone), minus individual skipped dates.
+  const [picks, setPicks] = useState<ProjectedCalendarSlot[]>([]);
+  const [repeatUntil, setRepeatUntil] = useState("");
+  const [skipped, setSkipped] = useState<string[]>([]);
   const allUsers = useQuery(api.users.listAllUsers, admin ? {} : "skip");
   const roster = useQuery(
     api.users.getStudentsForTeacher,
@@ -142,7 +149,7 @@ export function StaffCalendar({
   const replaceWeekly = useMutation(api.vacancies.replaceForTeacher);
   const reschedule = useMutation(api.calendar.rescheduleEvent),
     cancel = useMutation(api.calendar.cancelEvent);
-  const addLesson = useMutation(api.calendar.createOneTimeLesson),
+  const bookPlan_ = useMutation(api.lessonPlan.bookLessonPlan),
     rename = useMutation(api.calendar.renameEvent),
     start = useMutation(api.lessons.create);
   const timeOff = useMutation(api.calendar.blockTimeOff),
@@ -192,9 +199,9 @@ export function StaffCalendar({
   }, [availabilityEdits]);
   useEffect(() => {
     if (lastGesture.some((cell) => cell.open && cell.withinBookingNotice)) {
-      toast.info(availabilityText("nearTermOpened"));
+      toast.info(availabilityText("nearTermOpened", { hours: livePolicy?.bookingMinNoticeHours ?? 12 }));
     }
-  }, [lastGesture, availabilityText]);
+  }, [lastGesture, availabilityText, livePolicy?.bookingMinNoticeHours]);
   useEffect(() => {
     if (freshCells) availabilityEdits.observe(freshCells.cells);
   }, [freshCells, availabilityEdits]);
@@ -230,8 +237,13 @@ export function StaffCalendar({
     [repeat, setRepeat] = useState(false);
   const [from, setFrom] = useState(""),
     [until, setUntil] = useState("");
+  const bookedOff = useQuery(
+    api.calendar.bookedInRange,
+    off && from && until ? { fromDate: from, toDate: until, teacherId } : "skip",
+  );
   const [title, setTitle] = useState("");
-  const [cancelConfirm, setCancelConfirm] = useState(false);
+  // null → idle; "choose" → picking who the cancellation is for; else picked.
+  const [cancelChoice, setCancelChoice] = useState<null | "choose" | "teacher" | "student" | "academy">(null);
   const canEdit =
     !!me &&
     userHasPermission(me, admin ? "scheduling.edit" : "calendar.edit.full");
@@ -270,34 +282,81 @@ export function StaffCalendar({
   }
   function selectCell(cell: ProjectedCalendarSlot) {
     if (refreshing) return;
-    if (moving || (adding && studentId)) {
+    if (adding && studentId) {
+      if (!cell.canMove) return;
+      const key = `${cell.date}|${cell.startTime}`;
+      setPicks((current) =>
+        current.some((pick) => `${pick.date}|${pick.startTime}` === key)
+          ? current.filter((pick) => `${pick.date}|${pick.startTime}` !== key)
+          : [...current, cell],
+      );
+      setSkipped([]);
+      planRequest.current = "";
+      return;
+    }
+    if (moving) {
       if (cell.canMove) setTarget(cell);
       return;
     }
     if (cell.editable) void paint([cell], !cell.open);
   }
-  const lessonRequest = useRef({ key: "", id: "" });
-  async function saveLesson() {
-    if (!target || !studentId) return;
-    const key = `${studentId}|${target.date}|${target.startTime}`;
-    if (lessonRequest.current.key !== key)
-      lessonRequest.current = { key, id: crypto.randomUUID() };
-    const requestId = lessonRequest.current.id;
+  const planRequest = useRef("");
+  const planBookings = useMemo(() => {
+    const out = new Map<string, { date: string; startTime: string }>();
+    for (const pick of picks) {
+      if (!repeatUntil) {
+        out.set(`${pick.date}|${pick.startTime}`, { date: pick.date, startTime: pick.startTime });
+        continue;
+      }
+      // Step in the viewer's own calendar so DST never drifts the usual time.
+      for (
+        let day = pick.viewerDate;
+        day <= repeatUntil && out.size < 60;
+        day = new Date(Date.parse(`${day}T00:00:00Z`) + 7 * 86400000).toISOString().slice(0, 10)
+      ) {
+        const academy = convertZoned(day, pick.viewerStartTime, viewerTz, orgTz);
+        out.set(`${academy.date}|${academy.time}`, { date: academy.date, startTime: academy.time });
+      }
+    }
+    return [...out.entries()]
+      .filter(([key]) => !skipped.includes(key))
+      .map(([, booking]) => booking)
+      .sort((x, y) => `${x.date}${x.startTime}`.localeCompare(`${y.date}${y.startTime}`));
+  }, [picks, repeatUntil, skipped, viewerTz, orgTz]);
+  const planPreview = useQuery(
+    api.lessonPlan.previewLessonPlan,
+    adding && studentId && planBookings.length
+      ? { studentId, teacherId: admin ? teacherId : undefined, bookings: planBookings }
+      : "skip",
+  );
+  const planOk = planPreview?.items.filter((item) => item.ok) ?? [];
+  function resetPlan() {
+    setPicks([]);
+    setRepeatUntil("");
+    setSkipped([]);
+    planRequest.current = "";
+  }
+  function lessonLabel(date: string, startTime: string) {
+    const local = convertZoned(date, startTime, orgTz, viewerTz);
+    const day = new Date(`${local.date}T00:00:00Z`).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+    return `${day} · ${formatTime(local.time, clock)}`;
+  }
+  async function bookPlan() {
+    if (!planOk.length || !studentId) return;
+    planRequest.current ||= crypto.randomUUID();
     await run(async () => {
-      const result = await addLesson({
-        teacherId,
+      const result = await bookPlan_({
         studentId,
-        date: target.date,
-        startTime: target.startTime,
-        requestId,
+        teacherId: admin ? teacherId : undefined,
+        bookings: planOk.map(({ date, startTime }) => ({ date, startTime })),
+        requestId: planRequest.current,
       });
       setAdding(false);
-      setTarget(null);
       setStudentId("");
+      resetPlan();
       toast.success(
-        result.unpaid
-          ? "Lesson scheduled · payment needs admin follow-up"
-          : "Lesson scheduled",
+        `Booked ${result.booked} lesson${result.booked === 1 ? "" : "s"}` +
+          (result.unpaid ? ` · ${result.unpaid} need payment follow-up` : ""),
       );
     });
   }
@@ -355,9 +414,10 @@ export function StaffCalendar({
                 setAdding(true);
                 setMoving(null);
                 setTarget(null);
+                resetPlan();
               }}
             >
-              Add lesson
+              Book lessons
             </Button>
           )}
           <Button variant="outline" onClick={() => setTools((value) => !value)}>
@@ -409,7 +469,7 @@ export function StaffCalendar({
       )}
       {(moving || adding) && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
-          <strong>{moving ? "Choose the new time" : "Add lesson"}</strong>
+          <strong>{moving ? "Choose the new time" : "Book lessons"}</strong>
           {adding && (
             <select
               aria-label="Student"
@@ -418,6 +478,7 @@ export function StaffCalendar({
               onChange={(e) => {
                 setStudentId(e.target.value);
                 setTarget(null);
+                resetPlan();
               }}
             >
               <option value="">Choose student</option>
@@ -431,7 +492,9 @@ export function StaffCalendar({
           <span className="text-sm">
             {adding && !studentId
               ? "Choose a student first."
-              : "Select two free half-hour cells. Published availability is optional."}
+              : adding
+                ? "Tap each weekly lesson time (e.g. Mon 18:00 and Wed 18:00), then repeat it below."
+                : "Select two free half-hour cells. Published availability is optional."}
           </span>
           <Button
             variant="ghost"
@@ -439,10 +502,114 @@ export function StaffCalendar({
               setMoving(null);
               setAdding(false);
               setTarget(null);
+              resetPlan();
             }}
           >
             Exit
           </Button>
+        </div>
+      )}
+      {adding && studentId && picks.length > 0 && (
+        <div className="space-y-3 rounded-xl border bg-background p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium">Weekly times:</span>
+            {[...picks]
+              .sort((x, y) => `${x.viewerDate}${x.viewerStartTime}`.localeCompare(`${y.viewerDate}${y.viewerStartTime}`))
+              .map((pick) => (
+                <button
+                  key={`${pick.date}|${pick.startTime}`}
+                  type="button"
+                  className="rounded-full border px-2 py-0.5 text-sm"
+                  onClick={() => {
+                    setPicks((current) => current.filter((c) => c !== pick));
+                    setSkipped([]);
+                    planRequest.current = "";
+                  }}
+                  aria-label={`Remove ${lessonLabel(pick.date, pick.startTime)}`}
+                >
+                  {lessonLabel(pick.date, pick.startTime)} ×
+                </button>
+              ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={!!repeatUntil}
+                onChange={(e) => {
+                  const first = [...picks].sort((x, y) => x.viewerDate.localeCompare(y.viewerDate))[0];
+                  setRepeatUntil(
+                    e.target.checked
+                      ? new Date(Date.parse(`${first.viewerDate}T00:00:00Z`) + 27 * 86400000).toISOString().slice(0, 10)
+                      : "",
+                  );
+                  setSkipped([]);
+                  planRequest.current = "";
+                }}
+              />
+              Repeat every week
+            </label>
+            {repeatUntil && (
+              <label className="flex items-center gap-2 text-sm">
+                until
+                <Input
+                  type="date"
+                  className="w-auto"
+                  value={repeatUntil}
+                  min={[...picks].sort((x, y) => x.viewerDate.localeCompare(y.viewerDate))[0]?.viewerDate}
+                  onChange={(e) => {
+                    setRepeatUntil(e.target.value);
+                    setSkipped([]);
+                    planRequest.current = "";
+                  }}
+                />
+              </label>
+            )}
+          </div>
+          {planPreview === undefined ? (
+            <p className="text-sm text-muted-foreground">Checking the plan…</p>
+          ) : (
+            <>
+              <p className="text-sm">
+                <strong>{planOk.length}</strong> lesson{planOk.length === 1 ? "" : "s"} ·{" "}
+                {planOk.filter((item) => item.paid).length} paid from balance ({planPreview.balance} available)
+                {planOk.some((item) => !item.paid) && (
+                  <span className="text-amber-700 dark:text-amber-300">
+                    {" "}· {planOk.filter((item) => !item.paid).length} need payment follow-up
+                  </span>
+                )}
+              </p>
+              <ul className="max-h-56 space-y-1 overflow-auto text-sm">
+                {planPreview.items.map((item) => (
+                  <li key={`${item.date}|${item.startTime}`} className="flex flex-wrap items-center gap-2">
+                    <span className={item.ok ? "" : "text-muted-foreground line-through"}>
+                      {lessonLabel(item.date, item.startTime)}
+                    </span>
+                    {!item.ok && <span className="text-destructive">{item.reason}</span>}
+                    {item.ok && !item.paid && <span className="text-xs text-amber-700 dark:text-amber-300">unpaid</span>}
+                    {item.ok && (
+                      <button
+                        type="button"
+                        className="text-xs underline"
+                        onClick={() => {
+                          setSkipped((values) => [...values, `${item.date}|${item.startTime}`]);
+                          planRequest.current = "";
+                        }}
+                      >
+                        Skip
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {planPreview.items.some((item) => !item.ok) && (
+                <p className="text-xs text-muted-foreground">Crossed-out times don&apos;t fit and won&apos;t be booked.</p>
+              )}
+              <Button disabled={saving || planOk.length === 0} onClick={() => void bookPlan()}>
+                {saving ? "Booking…" : `Book ${planOk.length} lesson${planOk.length === 1 ? "" : "s"}`}
+              </Button>
+            </>
+          )}
         </div>
       )}
       {!admin &&
@@ -525,7 +692,7 @@ export function StaffCalendar({
         onEventClick={(ev) => {
           setEvent(ev);
           setTitle(ev.title);
-          setCancelConfirm(false);
+          setCancelChoice(null);
         }}
         canDragEvent={(ev) => {
           const row = cal.events.find((e) => e._id === ev._id);
@@ -548,7 +715,8 @@ export function StaffCalendar({
             : undefined
         }
         moveMode={!!moving || (adding && !!studentId)}
-        proposed={target ?? undefined}
+        proposed={moving ? (target ?? undefined) : undefined}
+        selected={adding ? picks.map(({ date, startTime }) => ({ date, startTime })) : []}
         disabled={actionSaving || refreshing || ((adding || !!moving) && saving) || (adding && !studentId)}
       />
       <Dialog open={!!event} onOpenChange={(value) => !value && setEvent(null)}>
@@ -631,40 +799,99 @@ export function StaffCalendar({
               )}
               {preview && (
                 <>
-                  <p className="text-sm text-muted-foreground">
-                    {cancelConfirm
-                      ? preview.cancel.reason
-                      : preview.reschedule.reason}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      disabled={!preview.reschedule.allowed || saving}
-                      onClick={() => {
-                        setMoving(event);
-                        setEvent(null);
-                        setAdding(false);
-                        setTarget(null);
-                      }}
-                    >
-                      Move lesson
-                    </Button>
-                    <Button
-                      variant="outline"
-                      disabled={!preview.cancel.allowed || saving}
-                      onClick={() =>
-                        cancelConfirm
-                          ? void run(async () => {
+                  {cancelChoice === null && (
+                    <p className="text-sm text-muted-foreground">
+                      {preview.reschedule.reason}{" "}
+                      <Link href={rulesHref} className="underline underline-offset-2">Rules</Link>
+                    </p>
+                  )}
+                  {cancelChoice === null ? (
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        disabled={!preview.reschedule.allowed || saving}
+                        onClick={() => {
+                          setMoving(event);
+                          setEvent(null);
+                          setAdding(false);
+                          setTarget(null);
+                        }}
+                      >
+                        Move lesson
+                      </Button>
+                      <Button
+                        variant="outline"
+                        disabled={(!preview.cancel.allowed && !preview.cancelForStudent?.allowed) || saving}
+                        onClick={() => setCancelChoice("choose")}
+                      >
+                        Cancel lesson
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">
+                        Why is this lesson cancelled?{" "}
+                        <Link href={rulesHref} className="text-xs font-normal underline underline-offset-2">Rules</Link>
+                      </p>
+                      {(admin
+                        ? ([
+                            ["student", "Student asked to cancel", preview.cancelForStudent],
+                            ["teacher", "Teacher can't make it", preview.cancel],
+                            ["academy", "Academy decision", preview.cancel],
+                          ] as const)
+                        : ([
+                            ["teacher", "I can't teach it", preview.cancel],
+                            ["student", "Student asked to cancel", preview.cancelForStudent],
+                          ] as const)
+                      ).map(([value, label, verdict]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          disabled={!verdict?.allowed || saving}
+                          onClick={() => setCancelChoice(value)}
+                          className="w-full rounded-md border px-3 py-2 text-start disabled:opacity-50"
+                          style={{
+                            borderColor: cancelChoice === value ? "var(--brand-purple, #6716A4)" : undefined,
+                            background: cancelChoice === value ? "rgba(103,22,164,0.06)" : undefined,
+                          }}
+                        >
+                          <span className="block text-sm font-medium">{label}</span>
+                          <span className="block text-xs text-muted-foreground">
+                            {value === "teacher" && verdict?.allowed
+                              ? admin
+                                ? "Lesson credited back; counts as the teacher's cancellation. The student is told the teacher can't make it."
+                                : `${verdict.reason}. The student is told you can't make it.`
+                              : value === "student" && verdict?.allowed
+                                ? `${verdict.reason}. The student is told it was cancelled at their request.`
+                                : value === "academy" && verdict?.allowed
+                                  ? "Lesson credited back. Nobody's cancellation record changes."
+                                  : verdict?.reason}
+                          </span>
+                        </button>
+                      ))}
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="destructive"
+                          disabled={cancelChoice === "choose" || saving}
+                          onClick={() =>
+                            cancelChoice !== "choose" &&
+                            void run(async () => {
                               await cancel({
                                 eventId: event._id as Id<"scheduleEvents">,
+                                cancelFor: cancelChoice ?? undefined,
                               });
                               setEvent(null);
-                            }, "Lesson cancelled")
-                          : setCancelConfirm(true)
-                      }
-                    >
-                      {cancelConfirm ? "Confirm cancellation" : "Cancel lesson"}
-                    </Button>
-                  </div>
+                              setCancelChoice(null);
+                            }, "Lesson cancelled — the student has been told")
+                          }
+                        >
+                          Confirm cancellation
+                        </Button>
+                        <Button variant="outline" disabled={saving} onClick={() => setCancelChoice(null)}>
+                          Back
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </>
@@ -678,7 +905,7 @@ export function StaffCalendar({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {moving ? "Move lesson" : "Confirm lesson"}
+              Move lesson
             </DialogTitle>
           </DialogHeader>
           {target && (
@@ -693,28 +920,19 @@ export function StaffCalendar({
                   {movePreview?.reason ?? "Checking this time…"}
                 </p>
               )}
-              {adding && (
-                <p className="text-sm">
-                  {students.find((s) => s.externalId === studentId)?.name} ·{" "}
-                  {cellData.studentBalance < (cellData.lessonCost ?? 1)
-                    ? "No lesson credit available. This booking will need payment follow-up."
-                    : "Uses one lesson credit."}
-                </p>
-              )}
               <Button
                 disabled={saving || (!!moving && !movePreview?.allowed)}
                 onClick={() =>
-                  moving
-                    ? void run(async () => {
-                        await reschedule({
-                          eventId: moving._id as Id<"scheduleEvents">,
-                          toDate: target.date,
-                          toStartTime: target.startTime,
-                        });
-                        setMoving(null);
-                        setTarget(null);
-                      }, "Lesson moved")
-                    : void saveLesson()
+                  moving &&
+                  void run(async () => {
+                    await reschedule({
+                      eventId: moving._id as Id<"scheduleEvents">,
+                      toDate: target.date,
+                      toStartTime: target.startTime,
+                    });
+                    setMoving(null);
+                    setTarget(null);
+                  }, "Lesson moved")
                 }
               >
                 {saving ? "Saving…" : "Confirm"}
@@ -729,8 +947,7 @@ export function StaffCalendar({
             <DialogTitle>Time off</DialogTitle>
           </DialogHeader>
           <p className="text-sm">
-            Move or cancel lessons first. Removing time off restores your custom
-            slots.
+            Removing time off later restores your custom slots.
           </p>
           <label>
             From
@@ -748,16 +965,53 @@ export function StaffCalendar({
               onChange={(e) => setUntil(e.target.value)}
             />
           </label>
+          {bookedOff && bookedOff.length > 0 && (
+            <div className="space-y-1 rounded-md border p-3 text-sm">
+              <p className="font-medium">
+                {bookedOff.length} lesson{bookedOff.length === 1 ? " is" : "s are"} booked in these dates
+              </p>
+              <ul className="space-y-0.5">
+                {bookedOff.map((row) => (
+                  <li key={row._id} className={row.canCancel ? "" : "text-destructive"}>
+                    {row.date} · {formatTime(row.startTime, clock)} · {row.studentName}
+                    {!row.canCancel && row.reason ? ` — ${row.reason}` : ""}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-muted-foreground">
+                {bookedOff.every((row) => row.canCancel)
+                  ? "They'll be cancelled as yours: each student gets their lessons back and one message saying you can't make it."
+                  : "Move the lessons marked in red first, or ask the academy to cancel them."}
+              </p>
+            </div>
+          )}
           <Button
-            disabled={saving || !from || !until}
+            disabled={
+              saving ||
+              !from ||
+              !until ||
+              bookedOff === undefined ||
+              (bookedOff.length > 0 && !bookedOff.every((row) => row.canCancel))
+            }
             onClick={() =>
               void run(async () => {
-                await timeOff({ teacherId, fromDate: from, toDate: until });
+                const result = await timeOff({
+                  teacherId,
+                  fromDate: from,
+                  toDate: until,
+                  cancelBookedLessons: (bookedOff?.length ?? 0) > 0,
+                });
                 setOff(false);
+                if (result.affectedLessons > 0)
+                  toast.success(
+                    `${result.affectedLessons} lesson${result.affectedLessons === 1 ? "" : "s"} cancelled — students have been told`,
+                  );
               }, "Time off saved")
             }
           >
-            Block these dates
+            {bookedOff && bookedOff.length > 0
+              ? `Cancel ${bookedOff.length} lesson${bookedOff.length === 1 ? "" : "s"} and block these dates`
+              : "Block these dates"}
           </Button>
           {[...offGroups.entries()].map(([id, group]) => (
             <div

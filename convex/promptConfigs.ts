@@ -69,6 +69,24 @@ export const resolveForGeneration = internalQuery({
   },
 });
 
+/** Same as resolveForGeneration, for background jobs that have no signed-in user. */
+export const _resolveForOrg = internalQuery({
+  args: { taskId: v.string(), organizationId: v.string() },
+  handler: async (ctx, { taskId, organizationId }) => {
+    const task = getAiTask(taskId);
+    if (!task) throw new Error("Unknown AI task");
+    const row = await ctx.db
+      .query("promptConfigs")
+      .withIndex("by_organization_and_configId", (q) =>
+        q.eq("organizationId", organizationId).eq("configId", task.configId)
+      )
+      .unique();
+    const config = row ?? defaultPromptConfigs.find((c) => c.configId === task.configId);
+    if (!config) throw new Error(`AI task "${taskId}" is not configured`);
+    return { ...config, ...task };
+  },
+});
+
 /**
  * Save an edited prompt. The list mixes stored rows with code fallbacks for
  * configs an org was never seeded with, so editing a fallback has to insert
@@ -144,7 +162,7 @@ export const resetToDefault = mutation({
   },
 });
 
-/** Fix the vocab_extraction prompt — was using "arabic" field for English word. */
+/** Reset the vocab_extraction prompt text to the current code default. */
 export const fixVocabPrompt = internalMutation({
   args: { orgId: v.string() },
   handler: async (ctx, { orgId }) => {
@@ -155,11 +173,11 @@ export const fixVocabPrompt = internalMutation({
       )
       .unique();
     if (!config) return "No vocab_extraction config found";
+    const fallback = defaultPromptConfigs.find((c) => c.configId === "vocab_extraction")!;
     await ctx.db.patch(config._id, {
-      systemPrompt:
-        'You are an English language teaching assistant. From the supplied, ID-labelled lesson utterances, suggest a short list of teachable English words or multi-word phrases that genuinely occur in the lesson. For each item give its exact surface form, its canonical lemma or phrase, the matching utteranceId, part of speech, a student-language translation, a concise contextual sense label, and a SHORT English definition. Do not invent sentences, do not use teacher notes as evidence, and do not return a word unless it occurs verbatim in the referenced utterance. Return ONLY a valid JSON array.\n\nFormat: [{"word": "exact English word or phrase", "lemma": "dictionary lemma or canonical phrase", "utteranceId": "the supplied utterance ID", "partOfSpeech": "noun|verb|adjective|phrase|adverb|other", "translation": "translation", "senseLabel": "brief contextual meaning label", "definition": "short English meaning"}]',
-      userPromptTemplate:
-        "Suggest teachable vocabulary only from these ID-labelled lesson utterances. Return word, lemma, utteranceId, partOfSpeech, translation, senseLabel and definition:\n\n{{transcript}}",
+      systemPrompt: fallback.systemPrompt,
+      userPromptTemplate: fallback.userPromptTemplate,
+      maxTokens: Math.max(config.maxTokens, fallback.maxTokens),
     });
     return "Vocab prompt fixed";
   },

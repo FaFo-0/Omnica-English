@@ -22,7 +22,9 @@ import {
   requireTenantPermission,
 } from "./lib/tenant";
 import { userHasPermission } from "./lib/permissions";
+import { notifyBestEffort } from "./notifications";
 import { instantToZoned } from "./lib/time";
+import { resolvePolicy } from "./lib/policy";
 import {
   activationForLessonStart,
   stateAfterUnstart,
@@ -224,11 +226,24 @@ export const grantLessonAdjustment = mutation({
       ctx,
       "billing.edit"
     );
-    return await grantPointsInternal(ctx, {
+    const result = await grantPointsInternal(ctx, {
       orgId,
       performedBy: user.externalId,
       ...args,
     });
+    if (args.points > 0) {
+      // Admin notes are internal; the student sees only what kind of grant it was.
+      const reason =
+        args.source === "trial" ? "trial lesson" : args.source === "makeup" ? "make-up lesson" : args.source === "refund" ? "refund" : undefined;
+      await notifyBestEffort(ctx, {
+        organizationId: orgId,
+        recipientId: args.studentId,
+        kind: "points_granted",
+        payload: { points: args.points, ...(reason ? { reason } : {}) },
+        link: "/student/billing",
+      });
+    }
+    return result;
   },
 });
 
@@ -594,6 +609,35 @@ export async function spendPointsInternal(
     createdAt: NOW(),
   });
 
+  // Booking used up the balance (or nearly): tell the student while they can
+  // still top up without a gap. Admin corrections (no event) stay quiet.
+  if (args.scheduleEventId && balanceAfter <= 1) {
+    const grant = drainedFrom[drainedFrom.length - 1];
+    if (balanceAfter === 0) {
+      // A batch that goes 1 → 0 should leave one notice, not two.
+      const earlier = await ctx.db
+        .query("notifications")
+        .withIndex("by_organization_and_recipientId_and_sourceKey", (q) =>
+          q
+            .eq("organizationId", args.orgId)
+            .eq("recipientId", args.studentId)
+            .eq("sourceKey", `balance-low:1:${grant}`)
+        )
+        .unique();
+      if (earlier && !earlier.readAt && !earlier.withdrawnAt) {
+        await ctx.db.patch(earlier._id, { withdrawnAt: NOW() });
+      }
+    }
+    await notifyBestEffort(ctx, {
+      organizationId: args.orgId,
+      recipientId: args.studentId,
+      kind: "balance_low",
+      payload: { balance: balanceAfter },
+      link: "/student/billing",
+      sourceKey: `balance-low:${balanceAfter}:${grant}`,
+    });
+  }
+
   return { balanceAfter, drainedFrom };
 }
 
@@ -775,20 +819,29 @@ export const spendCli = internalMutation({
 export const expireDailyCron = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const todayByOrg = new Map<string, string>();
-    const todayForOrg = async (orgId: string) => {
-      let today = todayByOrg.get(orgId);
-      if (today === undefined) {
-        today = await academyToday(ctx, orgId);
-        todayByOrg.set(orgId, today);
+    // One settings read per academy: its date and its expiry-warning days.
+    const orgInfo = new Map<string, { today: string; warnDays: number[] }>();
+    const infoForOrg = async (orgId: string) => {
+      let info = orgInfo.get(orgId);
+      if (info === undefined) {
+        const settings = await ctx.db.query("tenantSettings")
+          .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+          .unique();
+        const policy = resolvePolicy(settings?.policy);
+        info = {
+          today: instantToZoned(new Date(), settings?.timezone ?? "Asia/Almaty").date,
+          warnDays: [policy.expiryWarnFirstDays, policy.expiryWarnSecondDays],
+        };
+        orgInfo.set(orgId, info);
       }
-      return today;
+      return info;
     };
+    const todayForOrg = async (orgId: string) => (await infoForOrg(orgId)).today;
 
     // Walk every org's grants in one pass — cron isn't tenant-scoped.
     const all = await ctx.db.query("pointGrants").collect();
 
-    // POLICY §2 [PROPOSED → v1] — expiry warnings (14 days, then 3 days).
+    // POLICY §2 — expiry warnings at two admin-set horizons (default 14, 3 days).
     // Exactly-once per grant per horizon via sourceKey; the sentinel
     // NO_EXPIRY grants (un-activated packs, grandfathered rows) never warn.
     let warned = 0;
@@ -801,7 +854,7 @@ export const expireDailyCron = internalMutation({
           new Date(`${today}T00:00:00Z`).getTime()) /
           86_400_000
       );
-      if (days !== 14 && days !== 3) continue;
+      if (!(await infoForOrg(g.organizationId)).warnDays.includes(days)) continue;
       await ctx.runMutation(internal.notifications._notify, {
         organizationId: g.organizationId,
         recipientId: g.studentId,

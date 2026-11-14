@@ -528,3 +528,62 @@ export const _purgeLeftoverReferences = internalQuery({
     return { clean: Object.keys(leftovers).length === 0, leftovers };
   },
 });
+
+/**
+ * Operator: move an unpublished lesson (and its calendar booking) to another
+ * student — e.g. a lesson recorded under a test account because the real
+ * student had no account yet. Refuses published lessons or lessons with
+ * homework/vocabulary, which carry student-facing state.
+ */
+export const _reassignLesson = internalMutation({
+  args: {
+    lessonId: v.id("lessons"),
+    toStudentId: v.string(),
+    title: v.optional(v.string()),
+    lessonNumber: v.optional(v.number()),
+  },
+  handler: async (ctx, { lessonId, toStudentId, title, lessonNumber }) => {
+    const lesson = await ctx.db.get(lessonId);
+    if (!lesson) throw new Error("Lesson not found");
+    if (lesson.status === "published") throw new Error("Lesson is already published");
+    const student = await ctx.db.query("users")
+      .withIndex("by_organization_and_externalId", (q) => q.eq("organizationId", lesson.organizationId).eq("externalId", toStudentId))
+      .unique();
+    if (!student || student.role !== "student") throw new Error("Target is not a student of this academy");
+    const homework = await ctx.db.query("homework").withIndex("by_organization_and_lessonId", (q) => q.eq("organizationId", lesson.organizationId).eq("lessonId", lessonId)).take(1);
+    const vocab = await ctx.db.query("lessonVocabulary").withIndex("by_lessonId", (q) => q.eq("lessonId", lessonId)).take(1);
+    if (homework.length || vocab.length) throw new Error("Lesson already has homework or vocabulary");
+    const fromStudentId = lesson.studentId;
+    const rename = { ...(title ? { title } : {}), ...(lessonNumber !== undefined ? { lessonNumber } : {}) };
+    await ctx.db.patch(lessonId, { studentId: toStudentId, ...rename });
+    if (lesson.scheduleEventId) {
+      const event = await ctx.db.get(lesson.scheduleEventId);
+      if (event && event.studentId === fromStudentId) await ctx.db.patch(event._id, { studentId: toStudentId, ...rename });
+    }
+    return { fromStudentId, toStudentId, ...rename };
+  },
+});
+
+/**
+ * Operator: delete stored files by id, refusing any file a lesson still uses
+ * as its recording. Used once to remove superseded audio snapshots
+ * (2026-11-14); new snapshots replace their predecessor automatically.
+ */
+export const _deleteStorageFiles = internalMutation({
+  args: { ids: v.array(v.id("_storage")) },
+  handler: async (ctx, { ids }) => {
+    const lessons = await ctx.db.query("lessons").collect();
+    const inUse = new Set(lessons.map((lesson) => lesson.audioFileId).filter(Boolean));
+    let deleted = 0;
+    const refused: string[] = [];
+    for (const id of ids) {
+      if (inUse.has(id)) {
+        refused.push(id);
+        continue;
+      }
+      await ctx.storage.delete(id);
+      deleted += 1;
+    }
+    return { deleted, refused };
+  },
+});

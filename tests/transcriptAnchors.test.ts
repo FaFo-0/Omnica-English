@@ -5,6 +5,7 @@ import {
   resolveCandidateContext,
   type TranscriptToken,
 } from "../src/lib/transcriptAnchors.ts";
+import { buildTranscript } from "../src/lib/transcript.ts";
 
 function tok(text: string, speaker: string, startMs: number, endMs: number, isFinal = true): TranscriptToken {
   return { text, isFinal, startMs, endMs, speaker };
@@ -59,4 +60,16 @@ test("resolveCandidateContext matches a multi-word phrase in context", () => {
   const [u] = buildUtterances(tokens);
   const ctx = resolveCandidateContext(u, "look after");
   assert.equal(ctx.sentence, "I look after my sister.");
+});
+
+// The teacher can tell the app which voice is theirs; otherwise whoever spoke
+// first was labelled Teacher, which is wrong whenever the student opens.
+test("an identified teacher voice wins over 'first speaker is the teacher'", () => {
+  const studentFirst = [
+    { text: "Hello", isFinal: true, startMs: 0, endMs: 400, speaker: "1" },
+    { text: " Hi, how are you?", isFinal: true, startMs: 500, endMs: 1200, speaker: "2" },
+  ];
+  assert.deepEqual(buildUtterances(studentFirst).map((u) => u.speaker), ["Teacher", "Student"]);
+  assert.deepEqual(buildUtterances(studentFirst, "2").map((u) => u.speaker), ["Student", "Teacher"]);
+  assert.match(buildTranscript(studentFirst, "2"), /^\[Student\]: Hello\n\n\[Teacher\]: Hi, how are you\?$/);
 });

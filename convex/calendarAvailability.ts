@@ -20,6 +20,7 @@ import {
 import {
   POLICY,
   ordinaryBookingBoundary,
+  resolvePolicy,
   rescheduleVerdict,
   withinActionHorizon,
 } from "./lib/policy";
@@ -180,14 +181,15 @@ export const getCells = query({
     const activity = (settings?.activityTypes ?? []).find(
       (a) => a.isActive && !a.isGroup,
     );
-    const boundary = ordinaryBookingBoundary(now, orgTz);
+    const policy = resolvePolicy(settings?.policy);
+    const boundary = ordinaryBookingBoundary(now, orgTz, policy);
     const actor =
       user.role === "student"
         ? "student"
         : user.role === "teacher"
           ? "teacher"
           : "admin";
-    const move = event ? rescheduleVerdict({ actor, event, now, orgTz }) : null;
+    const move = event ? rescheduleVerdict({ actor, event, now, orgTz, policy }) : null;
     const editing =
       user.role !== "student" &&
       userHasPermission(
@@ -229,11 +231,11 @@ export const getCells = query({
           !overlapConflict(own, date, start, start + 60);
         const caps =
           own.filter((e) => e.date === date).length <
-            POLICY.maxStudentBookingsPerDay &&
+            policy.maxStudentBookingsPerDay &&
           own.filter((e) => mondayKey(e.date) === mondayKey(date)).length <
-            POLICY.maxStudentBookingsPerWeek;
+            policy.maxStudentBookingsPerWeek;
         const withinBookingNotice = startMs > now.getTime() &&
-          startMs < now.getTime() + POLICY.bookingMinNoticeHours * 3600000;
+          startMs < now.getTime() + policy.bookingMinNoticeHours * 3600000;
         const teacherBooking = user.role === "student" && fullOpen && free && withinBookingNotice;
         const canBook =
           user.role === "student" &&
@@ -242,7 +244,7 @@ export const getCells = query({
           caps &&
           fullOpen &&
           free &&
-          startMs >= now.getTime() + POLICY.bookingMinNoticeHours * 3600000 &&
+          startMs >= now.getTime() + policy.bookingMinNoticeHours * 3600000 &&
           startMs < boundary.upperExclusiveMs;
         const canMove =
           !(event?.date === date && event?.startTime === startTime) &&
@@ -258,6 +260,7 @@ export const getCells = query({
               { date, startTime, status: "scheduled" },
               now,
               orgTz,
+              policy,
             )) &&
           (actor !== "student" ||
             (fullOpen &&

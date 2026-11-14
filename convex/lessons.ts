@@ -22,7 +22,9 @@ import { POLICY } from "./lib/policy";
 import { chunkTranscript, utteranceIdFor } from "./lib/transcriptChunking";
 import { grantPointsInternal, spendPointsInternal, activateExpiryForEvent, revertExpiryForUnstartedEvent } from "./points";
 import { evaluateAchievements } from "./achievements";
+import { resolveLearnerLocale } from "./users";
 import { assignApprovedForLesson, reopenForLesson } from "./homework";
+import { notifyBestEffort } from "./notifications";
 import { upsertSavedVocabulary } from "./lib/vocabulary";
 import { normalizeLexeme } from "./lib/vocabularyIdentity";
 import { userHasPermission } from "./lib/permissions";
@@ -994,7 +996,18 @@ export const publish = mutation({
 
     // Approved homework travels with the lesson — one Publish sends the
     // summary, the vocabulary and the worksheet together.
-    await assignApprovedForLesson(ctx, orgId, id as Id<"lessons">, lesson.studentId);
+    const homeworkCount = await assignApprovedForLesson(ctx, orgId, id as Id<"lessons">, lesson.studentId, { notify: false });
+    if ((status ?? "published") === "published") {
+      // One notice per lesson: re-publishing after an edit stays quiet.
+      await notifyBestEffort(ctx, {
+        organizationId: orgId,
+        recipientId: lesson.studentId,
+        kind: "session_published",
+        payload: { lessonId: id, title: lesson.title, homeworkCount },
+        link: `/student/lessons/${id}`,
+        sourceKey: `published:${id}`,
+      });
+    }
 
     // Converge approved lesson vocabulary into the student's one "My Words"
     // deck. Each entry becomes (or extends) a sense-aware learner item with the
@@ -1382,6 +1395,11 @@ export const endSession = mutation({
       durationSeconds: liveSessionSeconds(lesson.sessionStartedAt, now, lesson.durationSeconds),
     };
     if (lesson.status === "recording") patch.status = "transcribed";
+    // Arabic-speaking student: Soniox writes much of the English in Arabic
+    // letters, so fix it automatically once the lesson ends (Undo on the page).
+    if (/[\u0600-\u06FF]/.test(lesson.transcript) && (await resolveLearnerLocale(ctx, orgId, lesson.studentId)) === "ar") {
+      await ctx.scheduler.runAfter(0, internal.transcriptEnglish.autoFix, { lessonId: id });
+    }
     if (recordedSeconds !== undefined) {
       patch.recordedSeconds = Math.max(
         0,

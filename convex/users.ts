@@ -9,6 +9,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { requireTenant, requireTenantPermission, ACADEMY_ID } from "./lib/tenant";
 import { DEFAULT_ROLES, PERMISSIONS } from "./lib/permissions";
+import { loadPolicy } from "./lib/policySettings";
 import { isSuperadmin } from "./lib/superadmin";
 import { assertQaIdentityAllowed } from "./lib/qaSafety";
 
@@ -311,7 +312,7 @@ export const getStudentRosterForTeacher = query({
         level: profile?.englishLevel ?? onboarding?.cefrSelfAssessed ?? null,
         phone: profile
           ? `${profile.phoneCountryCode} ${profile.phoneNumber}`.trim()
-          : (onboarding?.phoneWhatsapp ?? s.phoneWhatsapp ?? null),
+          : (s.phoneWhatsapp ?? onboarding?.phoneWhatsapp ?? null),
         balance,
         nextLesson,
         lastLesson,
@@ -429,13 +430,15 @@ export const getStudentDetailForTeacher = query({
         status: student.studentStatus ?? "active",
         locale: student.locale ?? "en",
         timezone: student.timezone ?? null,
+        // Raw answers for the admin edit form.
+        englishLevelRaw: onboarding?.cefrSelfAssessed ?? null,
         phone: profile
           ? `${profile.phoneCountryCode} ${profile.phoneNumber}`
-          : (onboarding?.phoneWhatsapp ?? student.phoneWhatsapp ?? null),
+          : (student.phoneWhatsapp ?? onboarding?.phoneWhatsapp ?? null),
         guardianName:
-          onboarding?.guardianName ?? student.guardianName ?? null,
+          student.guardianName ?? onboarding?.guardianName ?? null,
         guardianPhone:
-          onboarding?.guardianPhone ?? student.guardianPhone ?? null,
+          student.guardianPhone ?? onboarding?.guardianPhone ?? null,
         pausedUntil: student.pausedUntil ?? null,
         telegram: telegramConnection(student),
       },
@@ -611,7 +614,26 @@ export const getTeacherDetailForAdmin = query({
       teacherNoShows: live.filter((e) => e.status === "no_show_teacher").length,
       teacherCancellations: live.filter((e) => e.cancelledBy === "teacher").length,
       awaitingHomeworkReview: homework.filter((h) => h.status === "submitted").length,
+      lateMaterials: 0,
     };
+    // POLICY §10 — unpublished lesson material past the publishing window.
+    const policy = await loadPolicy(ctx, orgId);
+    for (const status of ["transcribed", "review"] as const) {
+      const rows = await ctx.db
+        .query("lessons")
+        .withIndex("by_organization_and_status", (q) =>
+          q.eq("organizationId", orgId).eq("status", status)
+        )
+        .collect();
+      stats.lateMaterials += rows.filter(
+        (l) =>
+          !l.isDeleted &&
+          l.teacherId === teacherId &&
+          Date.now() -
+            (Date.parse(l.sessionStartedAt ?? l.createdAt) + l.durationSeconds * 1000) >
+            policy.lessonPublishHours * 3_600_000
+      ).length;
+    }
     const recentSessions = [...live]
       .sort((a, b) =>
         `${b.date}T${b.startTime}`.localeCompare(`${a.date}T${a.startTime}`)
@@ -649,7 +671,22 @@ export const getTeacherDetailForAdmin = query({
       timeOff,
       stats,
       recentSessions,
+      policy: {
+        teacherMinWeeklyHours: policy.teacherMinWeeklyHours,
+        timeOffApprovalDays: policy.timeOffApprovalDays,
+        lessonPublishHours: policy.lessonPublishHours,
+      },
     };
+  },
+});
+
+/** Dismiss the one-time "lesson rules were updated" banner. */
+export const markPolicySeen = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const { user } = await requireTenant(ctx);
+    await ctx.db.patch(user._id, { policySeenAt: new Date().toISOString() });
+    return null;
   },
 });
 
@@ -732,6 +769,7 @@ export const updateMyProfile = mutation({
       const n = name.trim();
       if (!n) throw new Error("Name cannot be empty");
       patch.name = n;
+      patch.nameSetInApp = true;
     }
     if (timezone !== undefined) {
       try {
@@ -841,7 +879,7 @@ export async function upsertAuthUser(ctx: MutationCtx, initialRole: "student" | 
         throw new Error("This account no longer has access to the academy");
       }
       await ctx.db.patch(byToken._id, {
-        name: identity.name ?? byToken.name,
+        name: byToken.nameSetInApp ? byToken.name : identity.name ?? byToken.name,
         email: identity.email ?? byToken.email,
         avatarUrl: identity.pictureUrl ?? byToken.avatarUrl,
       });
@@ -1092,6 +1130,22 @@ export const assignTeacher = mutation({
         link: "/teacher/students",
         createdAt: now,
       });
+      const nextTeacher = await ctx.db
+        .query("users")
+        .withIndex("by_organization_and_externalId", (q) =>
+          q.eq("organizationId", orgId).eq("externalId", nextTeacherId),
+        )
+        .first();
+      if (nextTeacher?.name) {
+        await ctx.db.insert("notifications", {
+          organizationId: orgId,
+          recipientId: studentId,
+          kind: "teacher_assigned",
+          payload: { teacherId: nextTeacherId, teacherName: nextTeacher.name },
+          link: "/student/calendar",
+          createdAt: now,
+        });
+      }
     }
 
     await syncAutomaticHomeworkDeadlines(ctx,orgId,studentId);
@@ -1430,6 +1484,77 @@ export const setUserPermissions = mutation({
     await ctx.db.patch(target._id, {
       permissions: permissions && permissions.length > 0 ? permissions : undefined,
     });
+    return null;
+  },
+});
+
+/**
+ * Admin: correct anything a student entered about themselves. Writes the
+ * users row (what the app shows and messages) and the signup answers, so
+ * every page reads the same value. Login email lives in Clerk and is not
+ * editable here.
+ */
+export const adminUpdateStudentProfile = mutation({
+  args: {
+    studentId: v.string(),
+    name: v.string(),
+    phone: v.string(),
+    guardianName: v.string(),
+    guardianPhone: v.string(),
+    timezone: v.string(),
+    age: v.union(v.number(), v.null()),
+    englishLevel: v.string(),
+    country: v.string(),
+    goal: v.string(),
+    inTheirWords: v.string(),
+    preferredDays: v.array(v.string()),
+    preferredTimeOfDay: v.array(v.string()),
+    interests: v.array(v.string()),
+    referralSource: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const { orgId } = await requireTenantPermission(ctx, "users.edit");
+    const student = await ctx.db.query("users")
+      .withIndex("by_organization_and_externalId", (q) => q.eq("organizationId", orgId).eq("externalId", args.studentId))
+      .unique();
+    if (!student || student.role !== "student") throw new Error("Student not found");
+    const name = args.name.trim();
+    if (!name) throw new Error("Name cannot be empty");
+    const timezone = args.timezone.trim();
+    if (timezone) {
+      try { new Intl.DateTimeFormat("en-US", { timeZone: timezone }); } catch { throw new Error("Unknown timezone"); }
+    }
+    if (args.age !== null && (!Number.isInteger(args.age) || args.age < 3 || args.age > 120)) throw new Error("Age must be a whole number");
+    const text = (value: string) => value.trim() || undefined;
+
+    await ctx.db.patch(student._id, {
+      name,
+      nameSetInApp: true,
+      phoneWhatsapp: text(args.phone),
+      guardianName: text(args.guardianName),
+      guardianPhone: text(args.guardianPhone),
+      timezone: timezone || undefined,
+    });
+    const answers = {
+      phoneWhatsapp: text(args.phone),
+      guardianName: text(args.guardianName),
+      guardianPhone: text(args.guardianPhone),
+      timezone: timezone || undefined,
+      age: args.age ?? undefined,
+      cefrSelfAssessed: text(args.englishLevel),
+      country: text(args.country),
+      goal: text(args.goal),
+      preferredDaysTimes: text(args.inTheirWords),
+      preferredDays: args.preferredDays,
+      preferredTimeOfDay: args.preferredTimeOfDay,
+      interests: args.interests,
+      referralSource: text(args.referralSource),
+    };
+    const onboarding = await ctx.db.query("studentOnboarding")
+      .withIndex("by_organization_and_studentId", (q) => q.eq("organizationId", orgId).eq("studentId", args.studentId))
+      .unique();
+    if (onboarding) await ctx.db.patch(onboarding._id, answers);
+    else await ctx.db.insert("studentOnboarding", { organizationId: orgId, studentId: args.studentId, ...answers });
     return null;
   },
 });

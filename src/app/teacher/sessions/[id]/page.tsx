@@ -25,7 +25,10 @@ import {
   Plus,
   X,
   StickyNote,
+  MessageCircle,
+  Copy,
 } from "lucide-react";
+import { homeworkWhatsAppUrl } from "@/lib/homeworkShare";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -42,6 +45,8 @@ import { HomeworkBuilder } from "@/components/homework/HomeworkBuilder";
 import { HomeworkEditor } from "@/components/homework/HomeworkEditor";
 import { scoreDoc } from "@/components/homework/grading";
 import { LessonAudioPlayer } from "@/components/recording/LessonAudioPlayer";
+import { MistakesReview } from "@/components/lessons/MistakesReview";
+import { FixEnglishBar } from "@/components/lessons/FixEnglishBar";
 import { parseJsonCollection, describeJsonAnswer } from "@/lib/ai/jsonCollection";
 import { toast } from "sonner";
 
@@ -52,12 +57,19 @@ const SECTION_TO_PROMPT = {
   vocabulary: "vocab_extraction",
 } as const satisfies Record<Section, string>;
 
+const LEARNER_LANGUAGE_NAMES: Record<string, string> = { ru: "Russian", ar: "Arabic", kk: "Kazakh", en: "English" };
+
 const PARTS_OF_SPEECH = ["noun", "verb", "adjective", "adverb", "phrase", "pronoun", "preposition", "conjunction", "determiner", "interjection", "other"];
 
 export default function SessionReviewPage() {
   const { id } = useParams<{ id: string }>();
   const lessonId = id as Id<"lessons">;
   const router = useRouter();
+  // ?tab=homework etc. — the Homework page links straight to a tab.
+  const [initialTab] = useState(() => {
+    const tab = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab");
+    return tab && ["transcript", "mistakes", "summary", "vocabulary", "homework"].includes(tab) ? tab : "transcript";
+  });
 
   const lesson = useQuery(api.lessons.get, { id: lessonId });
   const learnerLocale = useQuery(api.users.getLearnerLocale, lesson ? { studentId: lesson.studentId } : "skip");
@@ -112,19 +124,20 @@ export default function SessionReviewPage() {
     .filter(Boolean)
     .join("");
 
-  // Vocabulary extraction gets stable utterance IDs. The model may choose an
-  // ID, but the server later verifies the phrase against that utterance and
-  // copies the recorded context itself.
-  const vocabularyExtractionSource = [
-    utterances
-      .map((u) =>
-        `[${u.utteranceId}${u.speaker ? ` · ${u.speaker}` : ""}]: ${u.text}`
-      )
-      .join("\n\n"),
-    notes.trim() ? `--- Teacher Notes (guidance only; not student context) ---\n${notes.trim()}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n\n");
+  // Vocabulary extraction gets the teacher notes first (the strongest signal
+  // for what was taught), then stable utterance IDs. The model may choose an
+  // ID, but the server later verifies the phrase against that utterance (or
+  // the saved notes) and copies the recorded context itself.
+  const learnerLanguage = LEARNER_LANGUAGE_NAMES[learnerLocale ?? "ru"] ?? "Russian";
+  const buildVocabularySource = (lines: { utteranceId: string; speaker?: string; text: string }[]) => [
+    `Learner language for translations: ${learnerLanguage}`,
+    notes.trim()
+      ? `--- Teacher Notes (highest priority: include every English target word or phrase written here) ---\n${notes.trim()}`
+      : "--- Teacher Notes ---\n(none)",
+    `--- Lesson Conversation (ID-labelled utterances) ---\n${lines
+      .map((u) => `[${u.utteranceId}${u.speaker ? ` · ${u.speaker}` : ""}]: ${u.text}`)
+      .join("\n\n")}`,
+  ].join("\n\n");
 
   if (lesson === undefined) {
     return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
@@ -142,7 +155,11 @@ export default function SessionReviewPage() {
     // utterance rows are still missing (upload/interrupted-capture modes).
     // Normalize first — the manual-add message is only for a lesson with NO
     // transcript at all.
-    let vocabSource = vocabularyExtractionSource;
+    let vocabSource = buildVocabularySource(utterances);
+    // The server only keeps note-only words that are in the SAVED notes.
+    if (section === "vocabulary" && notes !== (lesson?.teacherNotes ?? "")) {
+      await saveTeacherNotes({ id: lessonId, teacherNotes: notes });
+    }
     if (section === "vocabulary" && utterances.length === 0) {
       if (!lesson?.transcript?.trim()) {
         toast.error("This recording has no structured transcript yet. Add vocabulary manually instead.");
@@ -152,9 +169,7 @@ export default function SessionReviewPage() {
       try {
         const res = await ensureUtterances({ id: lessonId });
         if (res.normalized && res.utterances) {
-          vocabSource = res.utterances
-            .map((u) => `[${u.utteranceId}]: ${u.text}`)
-            .join("\n\n");
+          vocabSource = buildVocabularySource(res.utterances);
         } else if (res.reason !== "already-normalized") {
           toast.error("Couldn't prepare the transcript structure — try again in a moment.");
           setPreparingTranscript(false);
@@ -217,11 +232,10 @@ export default function SessionReviewPage() {
           translation: typeof it.translation === "string" ? it.translation : "",
           definition: typeof it.definition === "string" ? it.definition : "",
           senseLabel: typeof it.senseLabel === "string" ? it.senseLabel : undefined,
-          translationLocale: (it.translationLocale === "en" || it.translationLocale === "ar" || it.translationLocale === "ru" || it.translationLocale === "kk"
-            ? it.translationLocale
-            : "ru") as "en" | "ru" | "ar" | "kk",
+          translationLocale: (learnerLocale ?? "ru") as "en" | "ru" | "ar" | "kk",
           partOfSpeech: typeof it.partOfSpeech === "string" ? it.partOfSpeech : undefined,
           utteranceId: typeof it.utteranceId === "string" ? it.utteranceId.trim() : "",
+          heardAs: typeof it.heardAs === "string" && it.heardAs.trim() ? it.heardAs.trim() : undefined,
           included: true,
         }));
         await replaceVocab({ lessonId, items, generated: true });
@@ -430,9 +444,10 @@ export default function SessionReviewPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="transcript" className="mt-6">
+      <Tabs defaultValue={initialTab} className="mt-6">
         <TabsList className="session-tabs-list">
           <TabsTrigger value="transcript">Transcript & Audio</TabsTrigger>
+          <TabsTrigger value="mistakes">Mistakes</TabsTrigger>
           <TabsTrigger value="summary">
             Summary <StatusBadge s={lesson.contentStatus.summary} />
           </TabsTrigger>
@@ -447,6 +462,7 @@ export default function SessionReviewPage() {
         {/* Transcript + Audio + Notes */}
         <TabsContent value="transcript" className="mt-3 space-y-3">
           <LessonAudioPlayer lessonId={lessonId} />
+          {lesson.transcriptBeforeEnglishFix !== undefined && <FixEnglishBar lessonId={lessonId} />}
           <div
             className="session-transcript-card rounded-lg border bg-card p-5"
             style={{ borderColor: "var(--omnic-gray-100)" }}
@@ -482,6 +498,11 @@ export default function SessionReviewPage() {
               placeholder="Observations, vocabulary to highlight, student mistakes, follow-up ideas…"
             />
           </div>
+        </TabsContent>
+
+        {/* Speaking mistakes: AI suggests, teacher confirms */}
+        <TabsContent value="mistakes" className="mt-3">
+          <MistakesReview lessonId={lessonId} />
         </TabsContent>
 
         {/* Summary */}
@@ -715,6 +736,7 @@ function TeacherHomeworkTab({
   const [reviewComment, setReviewComment] = useState("");
   const [reviewing, setReviewing] = useState(false);
   const current = list[0];
+  const shareTarget = useQuery(api.homework.shareTarget, current && current.status !== "draft" ? { homeworkId: current._id } : "skip");
   const createdRef = useRef(false);
 
   // The teacher grades on a local copy so per-item marks aren't autosaved
@@ -962,6 +984,31 @@ function TeacherHomeworkTab({
           </div>
         )}
       </div>
+      {(status === "assigned" || status === "in_progress") && (() => {
+        const link = `${window.location.origin}/student/homework/${current._id}`;
+        return (
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              className="btn btn-tenant btn-sm"
+              href={homeworkWhatsAppUrl(link, shareTarget?.locale, shareTarget?.phone)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <MessageCircle size={13} className="me-1" />Send on WhatsApp
+            </a>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => void navigator.clipboard.writeText(link).then(() => toast.success("Homework link copied"))}
+            >
+              <Copy size={13} className="me-1" />Copy link
+            </button>
+            <span className="text-xs" style={{ color: "var(--omnic-gray-500)" }}>
+              Opens their homework after they sign in.
+            </span>
+          </div>
+        );
+      })()}
       <HomeworkEditor documentId={current._id} contentJson={current.contentJson} mode="readonly" onChange={() => {}} />
       {status === "reviewed" && current.teacherComment && (
         <div className="rounded-lg p-3 bg-green-50 dark:bg-green-950 text-green-900 dark:text-green-200 text-sm">
